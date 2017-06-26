@@ -23,6 +23,7 @@ set(solver_headers
   mosek_solver.h
   nlopt_solver.h
   snopt_solver.h
+  solver_id.h
   )
 set(optimization_files)
 set(optimization_requires)
@@ -36,9 +37,11 @@ list(APPEND optimization_files
   equality_constrained_qp_solver.cc
   linear_system_solver.cc
   mathematical_program.cc
+  mathematical_program_api.cc
   mathematical_program_solver_interface.cc
   moby_lcp_solver.cc
   no_dreal.cc
+  solver_id.cc
   symbolic_extraction.cc
   system_identification.cc
   )
