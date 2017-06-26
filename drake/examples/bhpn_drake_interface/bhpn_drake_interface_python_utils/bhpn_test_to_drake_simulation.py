@@ -1,4 +1,5 @@
 import os
+import multiprocessing
 import threading
 from geometry import shapes
 import lcm
@@ -9,9 +10,9 @@ import time
 interface_path = '/home/tristanthrush/FakeDesktop/spartan/drake/drake/examples/bhpn_drake_interface/'
 interface_build_path = '/home/tristanthrush/FakeDesktop/spartan/build/drake/drake/examples/bhpn_drake_interface/'
 
-bhpnToDrakeRobotConfMappings = {'PR2' : [('pr2Torso', 1), ('pr2Head', 2), ('pr2RightArm', 5), ('pr2LeftArm', 5)], 'IIWA' : []}
+bhpnToDrakeRobotConfMappings = {'PR2' : [('pr2Torso', 1), ('pr2Head', 2), ('pr2RightArm', 5), ('pr2LeftArm', 5)], 'IIWA' : [('robotRightArm', 7)]}
 
-robotInsertionArguments = {'PR2' : '13 50000 300 300 300 300 300 300 300 300 300 300 300 300 5 5 5 5 5 5 5 5 5 5 5 5 5 7 7 7 7 7 7 7 7 7 7 7 7 7 /examples/PR2/pr2_fixed.urdf ', 'IIWA' : '7 300 300 300 300 300 300 300 5 5 5 5 5 5 5 7 7 7 7 7 7 7 /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '}
+robotInsertionArguments = {'PR2' : 'true 13 50000 300 300 300 300 300 300 300 300 300 300 300 300 5 5 5 5 5 5 5 5 5 5 5 5 5 7 7 7 7 7 7 7 7 7 7 7 7 7 /examples/PR2/pr2_fixed.urdf ', 'IIWA' : 'false 7 300 300 300 300 300 300 300 0 0 0 0 0 0 0 5 5 5 5 5 5 5 /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '}
 
 
 class BhpnDrakeInterface:
@@ -29,18 +30,19 @@ class BhpnDrakeInterface:
 		self.drakeRobotConf = None
 		self.bhpnRobotConf = None
 
-		#start the thread with the drake simulation of the world
-		self.drakeSimulationCommand = self.createDrakeSimulationCommand(world, fixedRobot, objectConfs, fixedObjects)
-		self.drakeSimulation = threading.Thread(target=os.system, args=[self.drakeSimulationCommand])
-		self.drakeSimulation.daemon = True
-		self.drakeSimulation.start()
-
 		#create lcm, which allows communication between drake and bhpn
+		self.handlerPoisonPill = False
 		self.lc = lcm.LCM()
 		self.lc.subscribe('DRAKE_ROBOT_STATE', self.robotConfCallback)
 		self.robotConfHandler = threading.Thread(target=self.handleRobotConfCallback)
 		self.robotConfHandler.daemon = True
 		self.robotConfHandler.start()	
+
+		#start the thread with the drake simulation of the world
+		self.drakeSimulationCommand = self.createDrakeSimulationCommand(world, fixedRobot, objectConfs, fixedObjects)
+		self.drakeSimulation = multiprocessing.Process(target=os.system, args=[self.drakeSimulationCommand])
+		self.drakeSimulation.daemon = True
+		self.drakeSimulation.start()
 		
 		#wait for first message from drake about robot configuration
 		while self.drakeRobotConf is None:
@@ -50,6 +52,16 @@ class BhpnDrakeInterface:
 		self.bhpnRobotConf = robotConf
 		
 		print 'initialized the bhpn-drake interface'
+
+	def __del__(self):
+
+		print 'attempting to terminate the bhpn-drake interface'
+
+		self.handlerPoisonPill = True
+		self.robotConfHandler.join()
+		self.drakeSimulation.terminate()
+
+		print 'terminated the bhpn-drake interface'
 
 	def createDrakeSimulationCommand(self, world, fixedRobot, objectConfs, fixedObjects):
 
@@ -77,6 +89,7 @@ class BhpnDrakeInterface:
 				for value in objDrakePose:
 					command += str(value) + ' '
 				command += fixed
+		print 'command: ', command
 		return command
 		
 
@@ -118,7 +131,7 @@ class BhpnDrakeInterface:
 		
 
 	def handleRobotConfCallback(self):
-		while True:
+		while not self.handlerPoisonPill:
 			self.lc.handle()
 
 	
