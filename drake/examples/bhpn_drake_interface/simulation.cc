@@ -146,7 +146,6 @@ namespace drake {
                 auto status_sender = diagram_builder->AddSystem<RobotStateSender>(num_actuators);
                 status_sender->set_name("status_sender");
 
-                auto poses_pub = diagram_builder->AddSystem(systems::Make<double[]>)
                 diagram_builder->Connect(command_sub->get_output_port(0),
                                          command_receiver->get_input_port(0));
                 diagram_builder->Connect(command_receiver->get_output_port(0),
