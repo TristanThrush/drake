@@ -63,8 +63,24 @@ namespace drake {
                 std::vector <Vector3d> poses_xyz;
                 std::vector <Vector3d> poses_rpy;
                 std::vector <std::string> fixed;
+                int num_actuators = std::stoi(argv[1]);
+                std::vector<double> kp_temp;
+                std::vector<double> ki_temp;
+                std::vector<double> kd_temp;
 
-                for (int index = 1; index < argc; index++) {
+                for (int index = 2; index < num_actuators + 2; index++){
+                    kp_temp.push_back(std::stod(argv[index]));
+                }
+
+                for (int index = num_actuators + 2; index < 2*num_actuators + 2; index++){
+                    ki_temp.push_back(std::stod(argv[index]));
+                }
+
+                for (int index = 2*num_actuators + 2; index < 3*num_actuators + 2; index++){
+                    kd_temp.push_back(std::stod(argv[index]));
+                }
+
+                for (int index = 3*num_actuators + 2; index < argc; index++) {
                     urdf_paths.push_back(argv[index]);
                     index++;
                     double x = std::stod(argv[index]);
@@ -91,15 +107,21 @@ namespace drake {
                 systems::DiagramBuilder<double> *diagram_builder = builder.get_mutable_builder();
                 systems::RigidBodyPlant<double> *plant = builder.AddPlant(
                         build_world_tree(&world_info, urdf_paths, poses_xyz, poses_rpy, fixed));
-                const int num_actuators = plant->model_instance_actuator_command_input_port(world_info[0].instance_id).size();
+                //const int num_actuators = plant->model_instance_actuator_command_input_port(world_info[0].instance_id).size();
                 std::cout << num_actuators << "\n";
                 builder.AddVisualizer(&lcm);
 
                 //give the robot a controller
                 //TODO: give the ability to pass in the parameters of the controller, so that different robots can be switched in without limitation
-                const VectorX<double> kp = VectorX<double>::Constant(num_actuators, 300.0);
-                const VectorX<double> ki = VectorX<double>::Constant(num_actuators, 0.0);
-                const VectorX<double> kd = VectorX<double>::Constant(num_actuators, 5.0);
+                //const VectorX<double> kp(kp_temp.data()); //VectorX<double>::Constant(num_actuators, 1.0);
+                //const VectorX<double> ki(ki_temp.data());
+                //const VectorX<double> kd(kd_temp.data());
+                double* kp_ptr = &kp_temp[0];
+                double* ki_ptr = &ki_temp[0];
+                double* kd_ptr = &kd_temp[0];
+                Eigen::Map<Eigen::VectorXd> kp(kp_ptr, num_actuators);
+                Eigen::Map<Eigen::VectorXd> ki(ki_ptr, num_actuators);
+                Eigen::Map<Eigen::VectorXd> kd(kd_ptr, num_actuators);
                 std::unique_ptr <systems::PidController<double>> controller_ptr =
                         std::make_unique < systems::PidController <
                         double >> (plant->get_rigid_body_tree().B.block(0, 0, num_actuators, num_actuators).inverse(),
@@ -123,6 +145,8 @@ namespace drake {
                 status_pub->set_publish_period(lcmStatusPeriod);
                 auto status_sender = diagram_builder->AddSystem<RobotStateSender>(num_actuators);
                 status_sender->set_name("status_sender");
+
+                auto poses_pub = diagram_builder->AddSystem(systems::Make<double[]>)
                 diagram_builder->Connect(command_sub->get_output_port(0),
                                          command_receiver->get_input_port(0));
                 diagram_builder->Connect(command_receiver->get_output_port(0),
