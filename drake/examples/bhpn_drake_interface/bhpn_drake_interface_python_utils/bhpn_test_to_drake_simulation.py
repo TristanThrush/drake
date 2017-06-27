@@ -3,16 +3,17 @@ import multiprocessing
 import threading
 from geometry import shapes
 import lcm
-from drake import lcmt_robot_state
+from lcmt_robot_state import lcmt_robot_state
 from operator import sub
 import time
+import bhpn_to_drake_object
 
-interface_path = '/home/tristanthrush/FakeDesktop/spartan/drake/drake/examples/bhpn_drake_interface/'
-interface_build_path = '/home/tristanthrush/FakeDesktop/spartan/build/drake/drake/examples/bhpn_drake_interface/'
+interface_path = '/../../../../../../../../../../../../../../../../../../../../Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
+interface_build_path = '/../../../../../../../../../../../../../../../../../../../../Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
 
 bhpnToDrakeRobotConfMappings = {'PR2' : [('pr2Torso', 1), ('pr2Head', 2), ('pr2RightArm', 5), ('pr2LeftArm', 5)], 'IIWA' : [('robotRightArm', 7)]}
 
-robotInsertionArguments = {'PR2' : 'true 13 50000 300 300 300 300 300 300 300 300 300 300 300 300 5 5 5 5 5 5 5 5 5 5 5 5 5 7 7 7 7 7 7 7 7 7 7 7 7 7 /examples/PR2/pr2_fixed.urdf ', 'IIWA' : 'false 7 300 300 300 300 300 300 300 0 0 0 0 0 0 0 5 5 5 5 5 5 5 /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '}
+robotInsertionArguments = {'PR2' : 'true 13 50000 300 300 300 300 300 300 300 300 300 300 300 300 5 5 5 5 5 5 5 5 5 5 5 5 5 7 7 7 7 7 7 7 7 7 7 7 7 7 ' + interface_path + '../PR2/pr2_fixed.urdf ', 'IIWA' : 'false 7 300 300 300 300 300 300 300 0 0 0 0 0 0 0 5 5 5 5 5 5 5 /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '}
 
 
 class BhpnDrakeInterface:
@@ -40,7 +41,7 @@ class BhpnDrakeInterface:
 
 		#start the thread with the drake simulation of the world
 		self.drakeSimulationCommand = self.createDrakeSimulationCommand(world, fixedRobot, objectConfs, fixedObjects)
-		self.drakeSimulation = multiprocessing.Process(target=os.system, args=[self.drakeSimulationCommand])
+		self.drakeSimulation = multiprocessing.Process(target=os.system, args=['cd ' + interface_path +'; ' + self.drakeSimulationCommand])
 		self.drakeSimulation.daemon = True
 		self.drakeSimulation.start()
 		
@@ -71,7 +72,8 @@ class BhpnDrakeInterface:
 		def bhpnToDrakeObject(obj):
 			path_to_objects = interface_path + 'object_conversion_utils/'
 			shapes.writeOff(world.objectShapes[obj], path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
-			os.system(path_to_objects + 'bhpn_to_drake_object.py ' + path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
+                        print "hellooooo"
+			bhpn_to_drake_object.convert(path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
 
 		command = interface_build_path + 'simulation '
 		command += self.robotInsertionArguments
@@ -84,7 +86,7 @@ class BhpnDrakeInterface:
 				if obj in fixedObjects:
 					fixed = 'true '
 				bhpnToDrakeObject(obj)
-				command += '/examples/bhpn_drake_interface/object_conversion_utils/generated_drake_objects/' + obj + '.off.urdf '
+				command += interface_path + 'object_conversion_utils/generated_drake_objects/' + obj + '.off.urdf '
 				objDrakePose = convertToDrakePose(objectConfs[obj][obj][0])
 				for value in objDrakePose:
 					command += str(value) + ' '

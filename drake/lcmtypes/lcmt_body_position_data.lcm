@@ -1,12 +1,12 @@
 package drake;
 
-struct lcmt_body_wrench_data {
+struct lcmt_body_position_data {
   // The timestamp in milliseconds.
   int64_t timestamp;
 
-  int32_t num_bodies
+  int32_t num_bodies;
 
-  string body_names[num_bodies]
-  double body_positions[num_bodies][6]
+  string body_names[num_bodies];
+  double body_positions[num_bodies][6];
 
 }

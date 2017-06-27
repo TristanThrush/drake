@@ -243,6 +243,22 @@ lcm_libraries(
 )
 
 lcm_libraries(
+    name = "robot_state",
+    lcm_package = "drake",
+    lcm_srcs = [
+        "lcmt_robot_state.lcm",
+    ],
+)
+
+lcm_libraries(
+    name = "body_position_data",
+    lcm_package = "drake",
+    lcm_srcs = [
+        "lcmt_body_position_data.lcm",
+    ],
+)
+
+lcm_libraries(
     name = "iiwa",
     lcm_package = "drake",
     lcm_srcs = [
