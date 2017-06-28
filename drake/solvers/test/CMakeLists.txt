@@ -1,6 +1,9 @@
 drake_add_cc_test(decision_variable_test)
 target_link_libraries(decision_variable_test drakeOptimization)
 
+drake_add_cc_test(indeterminate_test)
+target_link_libraries(indeterminate_test drakeOptimization)
+
 drake_add_cc_test(binding_test)
 target_link_libraries(binding_test drakeOptimization)
 
@@ -68,6 +71,9 @@ target_link_libraries(gurobi_solver_test drakeCommon drakeOptimizationTest)
 
 drake_add_cc_test(mosek_solver_test)
 target_link_libraries(mosek_solver_test drakeCommon drakeOptimizationTest)
+
+drake_add_cc_test(mixed_integer_optimization_util_test)
+target_link_libraries(mixed_integer_optimization_util_test drakeCommon drakeMixedIntegerOptimizationUtil)
 
 drake_add_cc_test(linear_complementary_problem_test)
 target_link_libraries(linear_complementary_problem_test drakeOptimization)

@@ -322,6 +322,7 @@ GTEST_TEST(SchunkWsgLiftTest, BoxLiftTest) {
       ->GetValue<KinematicsResults<double>>();
   const int box_index = tree.FindBodyIndex("box");
   Vector3d final_pos = kinematics_results.get_body_position(box_index);
+  std::cout << final_pos << "\n";
   Vector3d displacement = final_pos - ideal_pos;
   double distance = displacement.norm();
 
