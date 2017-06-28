@@ -7,6 +7,7 @@
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/controllers/pid_controller.h"
+#include "drake/systems/controllers/inverse_dynamics_controller.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/common/drake_path.h"
@@ -27,13 +28,24 @@ using Eigen::MatrixXd;
 namespace drake {
     namespace examples {
         namespace bhpn_drake_interface {
-
+		
+template <typename ControllerType>
  	    std::unique_ptr <ControllerType> pr2_controller(const RigidBodyTree<double> tree){
+		const auto num_actuators = 13;
 		auto kp = VectorX<double>::Constant(1, 100000), VectorX<double>::Constant(num_actuators - 1, 300);
 		auto ki = VectorX<double>::Constant(num_actuators, 5);
 		auto kd = VectorX<double>::Constant(num_actuators, 7);
-		auto inv = tree.B.block(0, 0, num_actuators, num_actuators).inverse();
+		auto Binv = tree.B.block(0, 0, num_actuators, num_actuators).inverse();
 		return std::make_unique < systems::PidController < double >> (Binv, MatrixX<double>::Identity(2 * kp.size(), 2 * kp.size()), kp, ki, kd);
+	   }
+
+template <typename ControllerType>
+	    std::unique_ptr <ControllerType> iiwa_controller(const RigidBodyTree<double> tree){
+		const auto num_actuators = 7;
+		auto kp = VectorX<double>::Constant(num_actuators, 100);
+		auto ki = VectorX<double>::Constant(num_actuators, 0);
+		auto kd = VectorX<double>::Constant(num_actuators, 2);
+		return std::make_unique < systems::InverseDynamicsController < double >> (tree.Clone(), kp, ki, kd, false);
 	   }
 
             std::unique_ptr <RigidBodyTree<double>>
@@ -72,6 +84,7 @@ namespace drake {
                 std::vector <Vector3d> poses_rpy;
                 std::vector <std::string> fixed;
 		std::string robot_name(argv[1]);
+		
                 //bool useBinv = !std::string(argv[1]).compare("true");
                 //int num_actuators = std::stoi(argv[2]);
                 //std::vector<double> kp_temp;
@@ -117,9 +130,7 @@ namespace drake {
                 systems::DiagramBuilder<double> *diagram_builder = builder.get_mutable_builder();
                 systems::RigidBodyPlant<double> *plant = builder.AddPlant(
                         build_world_tree(&world_info, urdf_paths, poses_xyz, poses_rpy, fixed));
-		//const RigidBodyTree<double> *tree = &plant->get_rigid_body_tree();
-                std::cout << num_actuators << "\n";
-                std::cout << useBinv << "\n";
+		auto num_actuators = plant->get_rigid_body_tree().get_num_actuators();
                 builder.AddVisualizer(&lcm);
 
                 //give the robot a controller
@@ -143,7 +154,7 @@ namespace drake {
 		*/
 		std::cout << robot_name << "\n";
                 auto controller =
-                        builder.AddController < systems::PidController < double >> (
+                        builder.AddController < ControllerType> (
                                 world_info[0].instance_id, pr2_controller(plant->get_rigid_body_tree());
 
                 //set up communication with BHPN
