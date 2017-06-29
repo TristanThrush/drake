@@ -29,23 +29,29 @@ namespace drake {
     namespace examples {
         namespace bhpn_drake_interface {
 		
-template <typename ControllerType>
- 	    std::unique_ptr <ControllerType> pr2_controller(const RigidBodyTree<double> tree){
-		const auto num_actuators = 13;
-		auto kp = VectorX<double>::Constant(1, 100000), VectorX<double>::Constant(num_actuators - 1, 300);
-		auto ki = VectorX<double>::Constant(num_actuators, 5);
-		auto kd = VectorX<double>::Constant(num_actuators, 7);
-		auto Binv = tree.B.block(0, 0, num_actuators, num_actuators).inverse();
+ 	    std::unique_ptr<systems::PidController<double>> pr2_controller(systems::RigidBodyPlant<double>* plant){
+		int num_actuators = 13;
+		VectorX<double> kp(num_actuators);
+		kp << 100000, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300;
+		VectorX<double> ki(num_actuators);
+		ki << 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5;
+		VectorX<double> kd(num_actuators);
+		kd << 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7;
+		auto Binv = plant->get_rigid_body_tree().B.block(0, 0, num_actuators, num_actuators).inverse();
 		return std::make_unique < systems::PidController < double >> (Binv, MatrixX<double>::Identity(2 * kp.size(), 2 * kp.size()), kp, ki, kd);
+				
 	   }
 
-template <typename ControllerType>
-	    std::unique_ptr <ControllerType> iiwa_controller(const RigidBodyTree<double> tree){
-		const auto num_actuators = 7;
-		auto kp = VectorX<double>::Constant(num_actuators, 100);
-		auto ki = VectorX<double>::Constant(num_actuators, 0);
-		auto kd = VectorX<double>::Constant(num_actuators, 2);
-		return std::make_unique < systems::InverseDynamicsController < double >> (tree.Clone(), kp, ki, kd, false);
+	std::unique_ptr<systems::InverseDynamicsController<double>> iiwa_controller(std::unique_ptr<RigidBodyTree<double>> tree_){
+		int num_actuators = 7;
+		VectorX<double> kp(num_actuators);
+		kp << 100, 100, 100, 100, 100, 100, 100;
+		VectorX<double> ki(num_actuators);
+		ki << 0, 0, 0, 0, 0, 0, 0;
+		VectorX<double> kd(num_actuators);
+		kd << 2, 2, 2, 2, 2, 2, 2;
+		return std::make_unique < systems::InverseDynamicsController < double >> (std::move(tree_), kp, ki, kd, false);
+				
 	   }
 
             std::unique_ptr <RigidBodyTree<double>>
@@ -77,32 +83,13 @@ template <typename ControllerType>
 
             void main(int argc, char *argv[]) {
 
-                //parse the arguments (the arguments are the urdf paths of objects to place
-                //in the world - the first urdf should be the robot's urdf)
+                //parse the arguments
                 std::vector <std::string> urdf_paths;
                 std::vector <Vector3d> poses_xyz;
                 std::vector <Vector3d> poses_rpy;
                 std::vector <std::string> fixed;
 		std::string robot_name(argv[1]);
-		
-                //bool useBinv = !std::string(argv[1]).compare("true");
-                //int num_actuators = std::stoi(argv[2]);
-                //std::vector<double> kp_temp;
-                //std::vector<double> ki_temp;
-                //std::vector<double> kd_temp;
-/*
-                for (int index = 3; index < num_actuators + 3; index++){
-                    kp_temp.push_back(std::stod(argv[index]));
-                }
-
-                for (int index = num_actuators + 3; index < 2*num_actuators + 3; index++){
-                    ki_temp.push_back(std::stod(argv[index]));
-                }
-
-                for (int index = 2*num_actuators + 3; index < 3*num_actuators + 3; index++){
-                    kd_temp.push_back(std::stod(argv[index]));
-                }
-*/
+				
                 for (int index = 2; index < argc; index++) {
                     urdf_paths.push_back(argv[index]);
                     index++;
@@ -134,29 +121,6 @@ template <typename ControllerType>
                 builder.AddVisualizer(&lcm);
 
                 //give the robot a controller
-                /*
-                double* kp_ptr = &kp_temp[0];
-                double* ki_ptr = &ki_temp[0];
-                double* kd_ptr = &kd_temp[0];
-                Eigen::Map<Eigen::VectorXd> kp(kp_ptr, num_actuators);
-                Eigen::Map<Eigen::VectorXd> ki(ki_ptr, num_actuators);
-                Eigen::Map<Eigen::VectorXd> kd(kd_ptr, num_actuators);
-                MatrixX<double> Binv;
-                if(useBinv){
-                    Binv = plant->get_rigid_body_tree().B.block(0, 0, num_actuators, num_actuators).inverse();
-                }else{
-                    Binv = MatrixX<double>::Identity(kp.size(), kp.size());
-                }
-                std::unique_ptr <systems::PidController<double>> controller_ptr =
-                        std::make_unique < systems::PidController <
-                        double >> ( Binv,
-                                MatrixX<double>::Identity(2 * kp.size(), 2 * kp.size()), kp, ki, kd);
-		*/
-		std::cout << robot_name << "\n";
-                auto controller =
-                        builder.AddController < ControllerType> (
-                                world_info[0].instance_id, pr2_controller(plant->get_rigid_body_tree());
-
                 //set up communication with BHPN
                 auto command_sub = diagram_builder->AddSystem(
                         systems::lcm::LcmSubscriberSystem::Make<lcmt_robot_state>(
@@ -165,18 +129,35 @@ template <typename ControllerType>
                 auto command_receiver =
                         diagram_builder->AddSystem<RobotStateReceiver>(num_actuators);
                 command_receiver->set_name("command_receiver");
+		
                 auto status_pub = diagram_builder->AddSystem(
                         systems::lcm::LcmPublisherSystem::Make<lcmt_robot_state>(
                                 "DRAKE_ROBOT_STATE", &lcm));
+		
                 status_pub->set_name("status_publisher");
                 status_pub->set_publish_period(lcmStatusPeriod);
                 auto status_sender = diagram_builder->AddSystem<RobotStateSender>(num_actuators);
                 status_sender->set_name("status_sender");
-	
+		
                 diagram_builder->Connect(command_sub->get_output_port(0),
                                          command_receiver->get_input_port(0));
-                diagram_builder->Connect(command_receiver->get_output_port(0),
-                                         controller->get_input_port_desired_state());
+		
+		//connect the appropriate controller for the type of robot
+		if(!robot_name.compare("pr2")){
+			diagram_builder->Connect(command_receiver->get_output_port(0),
+                                         builder.AddController < systems::PidController <double>> (
+                                world_info[0].instance_id, pr2_controller(plant))->get_input_port_desired_state());
+		}else if(!robot_name.compare("iiwa")){
+			auto single_arm = std::make_unique<RigidBodyTree<double>>();
+    			parsers::urdf::AddModelInstanceFromUrdfFile(
+        		world_info[0].model_path, multibody::joints::kFixed, world_info[0].world_offset,
+        		single_arm.get());
+			diagram_builder->Connect(command_receiver->get_output_port(0),
+                                         builder.AddController < systems::InverseDynamicsController <double>> (
+                                world_info[0].instance_id, iiwa_controller(std::move(single_arm)))->get_input_port_desired_state());
+		}
+                
+		
                 diagram_builder->Connect(plant->model_instance_state_output_port(world_info[0].instance_id),
                                          status_sender->get_state_input_port());
                 diagram_builder->Connect(command_receiver->get_output_port(0),
