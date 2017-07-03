@@ -10,19 +10,20 @@ from operator import sub
 import time
 import bhpn_to_drake_object
 import atexit
+import math
 
 interface_path = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
 interface_build_path = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
 
-bhpnToDrakeRobotConfMappings = {'PR2' : [('pr2Torso', 1), ('pr2Head', 2), ('pr2RightArm', 5), ('pr2LeftArm', 5)], 'IIWA' : [('robotRightArm', 7)]}
+bhpnToDrakeRobotConfMappings = {'PR2' : [('pr2Torso', 1), ('pr2Head', 2), ('pr2RightArm', 7), ('pr2RightGripper', 1), ('pr2LeftArm', 7), ('pr2LeftGripper', 1)], 'IIWA' : [('robotRightArm', 7)]}
 
 robotInsertionArguments = {'PR2' : 'pr2 ' + '/examples/PR2/pr2_fixed.urdf ', 'IIWA' : 'iiwa /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '}
-
 
 class BhpnDrakeInterface:
   
   	def __init__(self, robotName, world, robotConf, fixedRobot, objectConfs, fixedObjects):
-		try:
+                print robotConf
+                try:
 			self.robotConfMapping = bhpnToDrakeRobotConfMappings[robotName]
 			self.robotInsertionArguments = robotInsertionArguments[robotName]
 
@@ -105,19 +106,29 @@ class BhpnDrakeInterface:
 	def commandDrakeRobotConf(self, bhpnConf, threshold):
 		msg = lcmt_robot_state()
 		msg.timestamp = time.time()*1000000
+                self.numJoints = 21
 		msg.num_joints = self.numJoints
 		for robotSection in self.robotConfMapping:
-			msg.joint_position += bhpnConf[robotSection[0]][:robotSection[1]]
+                    #a hack to get the gripper mapping for drake correct. TODO: make this cleaner
+                    if robotSection[0] == 'pr2LeftGripper' or robotSection[0] == 'pr2RightGripper':
+                        msg.joint_position += bhpnConf[robotSection[0]] + bhpnConf[robotSection[0]]
+                    else:
+                        msg.joint_position += bhpnConf[robotSection[0]][:robotSection[1]]
 		#currently the following are unused components of the message, as drake's robot state message is more general than I need
     		msg.joint_robot = [0]*self.numJoints
 		msg.joint_name = ['']*self.numJoints
 		msg.joint_velocity = [0.0]*self.numJoints
                 
                 print 'Attempting to move drake robot to bhpn commanded configuration.'
+                
 		while max(map(abs, map(sub, msg.joint_position, self.drakeRobotConf.joint_position))) >= threshold:
-    			self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
-			time.sleep(0.01)
-                    
+                        self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
+			time.sleep(0.1)
+                        print msg.joint_position
+                        print self.drakeRobotConf.joint_position
+                        print threshold
+                        print max(map(abs, map(sub, msg.joint_position, self.drakeRobotConf.joint_position)))
+                                          
                 print 'Moved drake robot to bhpn commanded configuration.'
 
 
@@ -134,10 +145,10 @@ class BhpnDrakeInterface:
 		self.drakeRobotConf = lcmt_robot_state.decode(data)
 		updatedNumJoints = 0
 		for robotSection in self.robotConfMapping:
-    			self.bhpnRobotConf = self.bhpnRobotConf.set(robotSection[0], list(self.drakeRobotConf.joint_position[updatedNumJoints:robotSection[1]]) + list(self.bhpnRobotConf[robotSection[0]][robotSection[1]-1:-1]))
+    			self.bhpnRobotConf = self.bhpnRobotConf.set(robotSection[0], list(self.drakeRobotConf.joint_position[updatedNumJoints:updatedNumJoints + robotSection[1]]))
 			updatedNumJoints += robotSection[1]
                 self.robotConfUpdatedByDrake = True
-
+               
         def getBhpnObjectConfs(self):
             return self.bhpnObjectConfs.copy()
                                 
@@ -146,15 +157,11 @@ class BhpnDrakeInterface:
                 
                 for obj in self.bhpnObjectConfs:
                     self.bhpnObjectConfs[obj] = self.convertToBhpnPose(msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
-                
+                                
         def convertToBhpnPose(self, position, orientation):
-                return hu.Pose(position[0], position[1], position[2], orientation[3])
+                return hu.Pose(position[0], position[1], position[2], 2*math.acos(orientation[0]))
 		
 
 	def handleLcmSubscribers(self):
 		while not self.handlerPoisonPill:
 			self.lc.handle()    
-        
-        
- 
-

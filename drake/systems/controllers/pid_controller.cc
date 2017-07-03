@@ -1,6 +1,7 @@
 #include "drake/systems/controllers/pid_controller.h"
 
 #include <string>
+#include <iostream>
 
 namespace drake {
 namespace systems {
@@ -91,7 +92,7 @@ void PidController<T>::CalcControl(const Context<T>& context,
            .matrix() +
        (kd_.array() * controlled_state_diff.tail(num_controlled_q_).array())
            .matrix() +
-       (ki_.array() * state_block.array()).matrix()));
+       (ki_.array() * state_block.array()).matrix())); 
 }
 
 template <typename T>

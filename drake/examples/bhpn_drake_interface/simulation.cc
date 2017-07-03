@@ -56,13 +56,16 @@ std::unique_ptr<systems::PidController<double>> valkyrie_controller(
 
 std::unique_ptr<systems::PidController<double>> pr2_controller(
     systems::RigidBodyPlant<double>* plant) {
-  int num_actuators = 13;
+  int num_actuators = 21;
   VectorX<double> kp(num_actuators);
-  kp << 100000, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300;
+  kp << 300000, 300, 300, 300, 300, 300, 300, 300, 300, 300, 0, 0, 300, 300, 300, 300, 300, 300, 300, 0, 0;
+  kp *= 0.2;
   VectorX<double> ki(num_actuators);
-  ki << 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5;
+  ki << 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0, 0, 5, 5, 5, 5, 5, 5, 5, 0, 0;
+  //ki *= 0;
   VectorX<double> kd(num_actuators);
-  kd << 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7;
+  kd << 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 7, 7, 7, 7, 7, 7, 7, 0, 0;
+  kd *= 0;
   auto Binv = plant->get_rigid_body_tree()
                   .B.block(0, 0, num_actuators, num_actuators)
                   .inverse();
@@ -149,6 +152,10 @@ void main(int argc, char* argv[]) {
       build_world_tree(&world_info, urdf_paths, poses_xyz, poses_rpy, fixed));
   auto num_actuators = plant->get_rigid_body_tree().get_num_actuators();
   std::cout << "num_actuators: " << num_actuators << "\n";
+  std::cout << "actuators: " << "\n";
+  for (RigidBodyActuator actuator : plant->get_rigid_body_tree().actuators){
+	std::cout << actuator.name_ << "\n";
+  }
   builder.AddVisualizer(&lcm);
 
   // set up communication with BHPN

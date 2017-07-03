@@ -2,8 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "drake/common/drake_path.h"
 #include "drake/common/eigen_matrix_compare.h"
+#include "drake/common/find_resource.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/qp_controller_system.h"
@@ -25,19 +25,17 @@ namespace {
 class ManipulatorInverseDynamicsControllerTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    const std::string kModelPath = drake::GetDrakePath() +
-                                   "/manipulation/models/iiwa_description/urdf/"
-                                   "iiwa14_polytope_collision.urdf";
+    const std::string kModelPath = FindResourceOrThrow(
+        "drake/manipulation/models/iiwa_description/urdf/"
+        "iiwa14_polytope_collision.urdf");
 
-    const std::string kAliasGroupsPath =
-        drake::GetDrakePath() +
-        "/examples/QPInverseDynamicsForHumanoids/"
-        "config/iiwa.alias_groups";
+    const std::string kAliasGroupsPath = FindResourceOrThrow(
+        "drake/examples/QPInverseDynamicsForHumanoids/"
+        "config/iiwa.alias_groups");
 
-    const std::string kControlConfigPath =
-        drake::GetDrakePath() +
-        "/examples/QPInverseDynamicsForHumanoids/"
-        "config/iiwa.id_controller_config";
+    const std::string kControlConfigPath = FindResourceOrThrow(
+        "drake/examples/QPInverseDynamicsForHumanoids/"
+        "config/iiwa.id_controller_config");
 
     auto robot = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
@@ -129,22 +127,21 @@ class ManipulatorInverseDynamicsControllerTest : public ::testing::Test {
             *qp_id_controller, context_.get()));
 
     // Computes results.
-    systems::UpdateActions<double> actions;
-    diagram_->CalcNextUpdateTime(*context_, &actions);
-    EXPECT_EQ(actions.events.size(), 1);
+    auto events = diagram_->AllocateCompositeEventCollection();
+    diagram_->CalcNextUpdateTime(*context_, events.get());
 
     std::unique_ptr<systems::State<double>> state = context_->CloneState();
 
     // Generates QpInput from the plan eval block within
     // ManipulatorInverseDynamicsController.
-    diagram_->CalcUnrestrictedUpdate(*context_, actions.events.front(),
-                                     state.get());
+    diagram_->CalcUnrestrictedUpdate(
+        *context_, events->get_unrestricted_update_events(), state.get());
     context_->get_mutable_state()->CopyFrom(*state);
 
     // Generates QpOuput from the inverse dynamics block within
     // ManipulatorInverseDynamicsController.
-    diagram_->CalcUnrestrictedUpdate(*context_, actions.events.front(),
-                                     state.get());
+    diagram_->CalcUnrestrictedUpdate(
+         *context_, events->get_unrestricted_update_events(), state.get());
     context_->get_mutable_state()->CopyFrom(*state);
 
     // Gets output.
