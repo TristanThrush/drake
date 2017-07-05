@@ -3,6 +3,7 @@ import multiprocessing
 import subprocess
 import threading
 from geometry import shapes, hu
+from robot import conf
 import lcm
 from lcmt_robot_state import lcmt_robot_state
 from lcmt_viewer_draw import lcmt_viewer_draw
@@ -15,25 +16,83 @@ import math
 interface_path = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
 interface_build_path = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
 
-bhpnToDrakeRobotConfMappings = {'PR2' : [('pr2Torso', 1), ('pr2Head', 2), ('pr2RightArm', 7), ('pr2RightGripper', 1), ('pr2LeftArm', 7), ('pr2LeftGripper', 1)], 'IIWA' : [('robotRightArm', 7)]}
+#'IIWA' : [('robotRightArm', 7)]
 
-robotInsertionArguments = {'PR2' : 'pr2 ' + '/examples/PR2/pr2_fixed.urdf ', 'IIWA' : 'iiwa /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '}
+#'IIWA' : 'iiwa /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '
+
+class RobotBhpnDrakeConnection:
+
+    def __init__(self, bhpnRobotConf):
+        self.bhpnRobotConf = bhpnRobotConf.copy()
+
+    def toBhpnRobotConf(self, drakeRobotConf):
+        raise NotImplementedError
+
+    def toDrakeRobotConf(self, bhpnRobotConf):
+        raise NotImplementedError
+    
+    def getInsertionArguments(self):
+        raise NotImplementedError
+
+    def getNumJoints(self):
+        raise NotImplementedError
+
+
+class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
+
+    def __init__(self, bhpnRobotConf):
+        RobotBhpnDrakeConnection.__init__(self, bhpnRobotConf)
+        self.robotName = 'PR2'
+        self.numJoints = 21
+        self.insertionArguments = 'pr2 /examples/PR2/pr2_fixed.urdf '
+
+    def toBhpnRobotConf(self, drakeRobotConf):
+        drake_joints = drakeRobotConf.joint_position
+        mapping = {'pr2Torso': drake_joints[0:1],
+                   'pr2Head': drake_joints[1:3],
+                   'pr2RightArm': drake_joints[3:10],
+                   'pr2RightGripper': drake_joints[10:11],
+                   'pr2LeftArm': drake_joints[12:19],
+                   'pr2LeftGripper': drake_joints[19:20]}
+        for k, v in mapping.items():
+            self.bhpnRobotConf = self.bhpnRobotConf.set(k, list(v))
+        return self.bhpnRobotConf.copy()
+
+    def toDrakeRobotConf(self, bhpnRobotConf):
+        msg = lcmt_robot_state()
+	msg.timestamp = time.time()*1000000
+        msg.num_joints = self.numJoints
+        msg.joint_position = bhpnRobotConf['pr2Torso']\
+                            + bhpnRobotConf['pr2Head']\
+                            + bhpnRobotConf['pr2RightArm']\
+                            + bhpnRobotConf['pr2RightGripper']*2\
+                            + bhpnRobotConf['pr2LeftArm']\
+                            + bhpnRobotConf['pr2LeftGripper']*2
+        msg.joint_robot = [0]*msg.num_joints
+	msg.joint_name = ['']*msg.num_joints
+	msg.joint_velocity = [0.0]*msg.num_joints
+        return msg
+    
+    def getInsertionArguments(self):
+        return self.insertionArguments
+
+    def getNumJoints(self):
+        return self.numJoints
+
 
 class BhpnDrakeInterface:
   
   	def __init__(self, robotName, world, robotConf, fixedRobot, objectConfs, fixedObjects):
-                print robotConf
-                try:
-			self.robotConfMapping = bhpnToDrakeRobotConfMappings[robotName]
-			self.robotInsertionArguments = robotInsertionArguments[robotName]
+                supportedRobots = {'PR2': Pr2BhpnDrakeConnection}
 
+                try:
+		    self.robotConnection = supportedRobots[robotName](robotConf)
+        
 		except KeyError:
 			print "It appears that this robot is not supported in the bhpn to drake interface."
-
-		self.numJoints = sum(map(lambda robotSection: robotSection[1], self.robotConfMapping))
 		
 		self.drakeRobotConf = None
-		self.bhpnRobotConf = robotConf #the robot conf from the drake simulation, converted to the appropriate bhpn object type
+		self.bhpnRobotConf = robotConf.copy() #the robot conf from the drake simulation, converted to the appropriate bhpn object type
                 self.robotConfUpdatedByDrake = False
                 self.bhpnObjectConfs = objectConfs #the object confs (aka poses) from the drake simulation, converted to the appropriate bbhpn object type
 
@@ -73,7 +132,7 @@ class BhpnDrakeInterface:
 
 		print 'Terminated the bhpn-drake interface.'
 
-	def createDrakeSimulationCommand(self, world, fixedRobot, objectConfs, fixedObjects):
+	def createDrakeSimulationCommand(self, world, fixedRobot, objectConfs, fixedObjects):                
 
 		def convertToDrakePose(pose):
 			return pose.x, pose.y, pose.z, 0, 0, pose.theta
@@ -83,8 +142,11 @@ class BhpnDrakeInterface:
 			shapes.writeOff(world.objectShapes[obj], path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
                 	bhpn_to_drake_object.convert(path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
 
-		command = interface_build_path + 'simulation '
-		command += self.robotInsertionArguments
+    		command = interface_build_path + 'simulation '
+                command += str(self.robotConnection.getNumJoints()) + ' '
+                for joint in self.robotConnection.toDrakeRobotConf(self.bhpnRobotConf).joint_position:
+                    command += str(joint) + ' '
+		command += self.robotConnection.getInsertionArguments()
 		command += '0 0 0 0 0 0 '
 		command += str(fixedRobot).lower() + ' '
 
@@ -104,31 +166,12 @@ class BhpnDrakeInterface:
 		
 
 	def commandDrakeRobotConf(self, bhpnConf, threshold):
-		msg = lcmt_robot_state()
-		msg.timestamp = time.time()*1000000
-                self.numJoints = 21
-		msg.num_joints = self.numJoints
-		for robotSection in self.robotConfMapping:
-                    #a hack to get the gripper mapping for drake correct. TODO: make this cleaner
-                    if robotSection[0] == 'pr2LeftGripper' or robotSection[0] == 'pr2RightGripper':
-                        msg.joint_position += bhpnConf[robotSection[0]] + bhpnConf[robotSection[0]]
-                    else:
-                        msg.joint_position += bhpnConf[robotSection[0]][:robotSection[1]]
-		#currently the following are unused components of the message, as drake's robot state message is more general than I need
-    		msg.joint_robot = [0]*self.numJoints
-		msg.joint_name = ['']*self.numJoints
-		msg.joint_velocity = [0.0]*self.numJoints
-                
+                msg = self.robotConnection.toDrakeRobotConf(bhpnConf)
                 print 'Attempting to move drake robot to bhpn commanded configuration.'
-                
+                self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
 		while max(map(abs, map(sub, msg.joint_position, self.drakeRobotConf.joint_position))) >= threshold:
-                        self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
 			time.sleep(0.1)
-                        print msg.joint_position
-                        print self.drakeRobotConf.joint_position
-                        print threshold
-                        print max(map(abs, map(sub, msg.joint_position, self.drakeRobotConf.joint_position)))
-                                          
+                        self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())           
                 print 'Moved drake robot to bhpn commanded configuration.'
 
 
@@ -143,12 +186,9 @@ class BhpnDrakeInterface:
 
 	def robotConfCallback(self, channel, data):
 		self.drakeRobotConf = lcmt_robot_state.decode(data)
-		updatedNumJoints = 0
-		for robotSection in self.robotConfMapping:
-    			self.bhpnRobotConf = self.bhpnRobotConf.set(robotSection[0], list(self.drakeRobotConf.joint_position[updatedNumJoints:updatedNumJoints + robotSection[1]]))
-			updatedNumJoints += robotSection[1]
+                self.bhpnRobotConf = self.robotConnection.toBhpnRobotConf(self.drakeRobotConf)
                 self.robotConfUpdatedByDrake = True
-               
+                               
         def getBhpnObjectConfs(self):
             return self.bhpnObjectConfs.copy()
                                 

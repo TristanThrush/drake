@@ -20,11 +20,11 @@ def load_robot_from_urdf(urdf_file):
     base_dir = os.path.dirname(urdf_file)
     package_map = pydrake.rbtree.PackageMap()
     weld_frame = None
-    floating_base_type = pydrake.rbtree.kRollPitchYaw
+    floating_base_type = pydrake.rbtree.kFixed
 
     # Load our model from URDF
     robot = pydrake.rbtree.RigidBodyTree()
-
+    
     pydrake.rbtree.AddModelInstanceFromUrdfStringSearchingInRosPackages(
       urdf_string,
       package_map,
@@ -32,11 +32,11 @@ def load_robot_from_urdf(urdf_file):
       floating_base_type,
       weld_frame,
       robot)
-
+    
     return robot
 
 
-urdf_file = os.path.join(pydrake.getDrakePath(), "examples/PR2/pr2.urdf")
+urdf_file = "/Users/tristanthrush/research/mit/drake/drake/examples/PR2/pr2_fixed.urdf"
 
 # Load our model from URDF
 robot = load_robot_from_urdf(urdf_file)
@@ -92,8 +92,12 @@ constraints = [
                ]
 
 q_seed = robot.getZeroConfiguration()
+print('q_seed', q_seed)
+t = np.array([0., 1.])
+q_seed_array = np.transpose(np.array([q_seed, q_seed]))[0]
+q_nom_array = np.transpose(np.array([q_seed, q_seed]))[0]
 options = ik.IKoptions(robot)
-results = ik.InverseKin(robot, q_seed, q_seed, constraints, options)
+results = ik.InverseKinTraj(robot, t, q_seed_array, q_nom_array, constraints, options)
 
 # Each entry (only one is present in this case, since InverseKin()
 # only returns a single result) in results.info gives the output
@@ -103,3 +107,4 @@ results = ik.InverseKin(robot, q_seed, q_seed, constraints, options)
 assert results.info[0] == 1
 
 print(repr(results.q_sol[0]))
+print(repr(results.q_sol))

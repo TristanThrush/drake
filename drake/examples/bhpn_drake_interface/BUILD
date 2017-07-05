@@ -93,7 +93,9 @@ drake_cc_binary(
 	"//drake/systems/controllers:inverse_dynamics_controller",
         "//drake/systems/controllers:pid_controller",
         "//drake/systems/primitives:constant_vector_source",
+	"//drake/systems/primitives:trajectory_source",
 	"//drake/systems/primitives:multiplexer",
+	"//drake/common/trajectories:piecewise_polynomial_trajectory",
         "@com_github_gflags_gflags//:gflags",
     ],
 )
