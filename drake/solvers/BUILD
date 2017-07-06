@@ -192,6 +192,7 @@ drake_cc_library(
         ":snopt_solver",
         ":solver_id",
         ":solver_type",
+        ":solver_type_converter",
         ":symbolic_extraction",
         "//drake/common",
         "//drake/common:autodiff",
@@ -240,7 +241,7 @@ drake_cc_library(
     ],
     deps = [
         ":rotation_constraint",
-        "//drake/common:call_matlab",
+        "//drake/common/proto:call_matlab",
     ],
 )
 
@@ -805,7 +806,7 @@ drake_cc_binary(
     deps = [
         ":mathematical_program",
         ":rotation_constraint",
-        "//drake/common:call_matlab",
+        "//drake/common/proto:call_matlab",
     ],
 )
 

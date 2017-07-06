@@ -64,19 +64,6 @@ drake_cc_library(
     ],
 )
 
-drake_cc_library(
-    name = "oracular_state_estimator",
-    srcs = ["lcm_utils/oracular_state_estimator.cc"],
-    hdrs = ["lcm_utils/oracular_state_estimator.h"],
-    linkstatic = 1,
-    deps = [
-        "//drake/manipulation/util:robot_state_msg_translator",
-        "//drake/systems/framework:leaf_system",
-        "//drake/util:lcm_util",
-        "@lcmtypes_bot2_core",
-    ],
-)
-
 drake_cc_binary(
     name = "simulation",
     srcs = ["simulation.cc"],
