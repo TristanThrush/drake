@@ -85,7 +85,6 @@ drake_cc_binary(
         ":robot_state_lcm",
         ":sim_diagram_builder",
         ":world_sim_tree_builder",
-	":oracular_state_estimator",
         "//drake/lcm",
         "//drake/multibody/rigid_body_plant",
 	"//drake/multibody:inverse_kinematics",

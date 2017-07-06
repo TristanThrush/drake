@@ -12,7 +12,8 @@ namespace examples {
 namespace bhpn_drake_interface {
 // TODO(naveenoid): Consider a common location for this class.
 
-template<typename T> struct ModelInstanceInfo {
+template <typename T>
+struct ModelInstanceInfo {
   std::string model_path;
   int instance_id;
   std::shared_ptr<RigidBodyFrame<T>> world_offset;

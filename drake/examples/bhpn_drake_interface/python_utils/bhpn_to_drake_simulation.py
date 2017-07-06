@@ -12,6 +12,7 @@ import time
 import bhpn_to_drake_object
 import atexit
 import math
+import pydrake
 
 interface_path = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
 interface_build_path = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
@@ -19,6 +20,7 @@ interface_build_path = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/
 #'IIWA' : [('robotRightArm', 7)]
 
 #'IIWA' : 'iiwa /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '
+
 
 class RobotBhpnDrakeConnection:
 
@@ -30,8 +32,8 @@ class RobotBhpnDrakeConnection:
 
     def toDrakeRobotConf(self, bhpnRobotConf):
         raise NotImplementedError
-    
-    def getInsertionArguments(self):
+
+    def getUrdfPath(self):
         raise NotImplementedError
 
     def getNumJoints(self):
@@ -42,9 +44,9 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
 
     def __init__(self, bhpnRobotConf):
         RobotBhpnDrakeConnection.__init__(self, bhpnRobotConf)
-        self.robotName = 'PR2'
+        self.robotName = 'pr2'
         self.numJoints = 21
-        self.insertionArguments = 'pr2 /examples/PR2/pr2_fixed.urdf '
+        self.urdfPath = '/examples/PR2/pr2_fixed.urdf'
 
     def toBhpnRobotConf(self, drakeRobotConf):
         drake_joints = drakeRobotConf.joint_position
@@ -60,148 +62,249 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
 
     def toDrakeRobotConf(self, bhpnRobotConf):
         msg = lcmt_robot_state()
-	msg.timestamp = time.time()*1000000
+        msg.timestamp = time.time() * 1000000
         msg.num_joints = self.numJoints
         msg.joint_position = bhpnRobotConf['pr2Torso']\
-                            + bhpnRobotConf['pr2Head']\
-                            + bhpnRobotConf['pr2RightArm']\
-                            + bhpnRobotConf['pr2RightGripper']*2\
-                            + bhpnRobotConf['pr2LeftArm']\
-                            + bhpnRobotConf['pr2LeftGripper']*2
-        msg.joint_robot = [0]*msg.num_joints
-	msg.joint_name = ['']*msg.num_joints
-	msg.joint_velocity = [0.0]*msg.num_joints
+            + bhpnRobotConf['pr2Head']\
+            + bhpnRobotConf['pr2RightArm']\
+            + bhpnRobotConf['pr2RightGripper'] * 2\
+            + bhpnRobotConf['pr2LeftArm']\
+            + bhpnRobotConf['pr2LeftGripper'] * 2
+        msg.joint_robot = [0] * msg.num_joints
+        msg.joint_name = [''] * msg.num_joints
+        msg.joint_velocity = [0.0] * msg.num_joints
         return msg
-    
-    def getInsertionArguments(self):
-        return self.insertionArguments
+
+    def getUrdfPath(self):
+        return self.urdfPath
 
     def getNumJoints(self):
         return self.numJoints
 
 
 class BhpnDrakeInterface:
-  
-  	def __init__(self, robotName, world, robotConf, fixedRobot, objectConfs, fixedObjects):
-                supportedRobots = {'PR2': Pr2BhpnDrakeConnection}
 
-                try:
-		    self.robotConnection = supportedRobots[robotName](robotConf)
-        
-		except KeyError:
-			print "It appears that this robot is not supported in the bhpn to drake interface."
-		
-		self.drakeRobotConf = None
-		self.bhpnRobotConf = robotConf.copy() #the robot conf from the drake simulation, converted to the appropriate bhpn object type
-                self.robotConfUpdatedByDrake = False
-                self.bhpnObjectConfs = objectConfs #the object confs (aka poses) from the drake simulation, converted to the appropriate bbhpn object type
+    def __init__(
+            self,
+            robotName,
+            world,
+            bhpnRobotConf,
+            robotFixed,
+            bhpnObjectConfs,
+            fixedObjects):
+        self.robotName = robotName.lower()
+        supportedRobots = {'pr2': Pr2BhpnDrakeConnection}
 
-		#create lcm, which allows communication between drake and bhpn
-		self.lc = lcm.LCM()
+        try:
+            self.robotConnection = supportedRobots[self.robotName](
+                bhpnRobotConf)
 
-                #this is for controlling the robot 
-		self.lc.subscribe('DRAKE_ROBOT_STATE', self.robotConfCallback)
-                #This is for reciving the poses of all of the objects in the world. 
-                #It piggybacks off of the messages sent by the drake simulator for the drake visualizer.
-                self.lc.subscribe('DRAKE_VIEWER_DRAW', self.objectPoseCallback)
-                #start a thread that handles the lcm subscribers
-                self.handlerPoisonPill = False
-                self.robotConfHandler = threading.Thread(target=self.handleLcmSubscribers)
-		self.robotConfHandler.daemon = True
-		self.robotConfHandler.start()	
-               
-		#start a subprocess with the drake simulation of the world
-		self.drakeSimulationCommand = self.createDrakeSimulationCommand(world, fixedRobot, objectConfs, fixedObjects)
-		self.drakeSimulation = subprocess.Popen('cd ' + interface_build_path + '; ' + 'exec '+self.drakeSimulationCommand, shell=True)		
-		#wait for first message from drake about robot configuration
-		while self.robotConfUpdatedByDrake is False:
-			time.sleep(0.1)	
-				
-                atexit.register(self.release)
-		print 'Initialized the bhpn-drake interface.'
+        except KeyError:
+            print "It appears that this robot is not supported in the bhpn to drake interface."
 
-	def release(self):
+        self.world = world.copy()
+        self.bhpnRobotConf = bhpnRobotConf.copy()
+        self.initialBhpnRobotPose = self.bhpnRobotConf.basePose()
+        self.robotFixed = robotFixed
+        self.bhpnObjectConfs = bhpnObjectConfs.copy()
+        self.fixedObjects = fixedObjects.copy()
 
-		print 'Attempting to terminate the bhpn-drake interface.'
+        self.drakeRobotConf = None
+        self.drakePosesXYZRPY = {}
+        self.robotConfUpdatedByDrake = False
+        self.objectFiles = self.createDrakeObjectFiles()
+        self.urdfToName = {
+            urdf: name for name,
+            urdf in self.objectFiles.iteritems()}
+        self.urdfToName[interface_path +
+                        self.robotConnection.getUrdfPath()] = self.robotName
 
-		self.handlerPoisonPill = True
-		self.robotConfHandler.join()
-		self.drakeSimulation.terminate()
-                returncode = self.drakeSimulation.wait()
-                print "Returncode of simulation: ", returncode
+        self.lc = lcm.LCM()
+        self.lc.subscribe('DRAKE_ROBOT_STATE', self.robotConfCallback)
+        self.lc.subscribe('DRAKE_VIEWER_DRAW', self.objectPoseCallback)
 
-		print 'Terminated the bhpn-drake interface.'
+        self.handlerPoisonPill = False
+        self.robotConfHandler = threading.Thread(
+            target=self.handleLcmSubscribers)
+        self.robotConfHandler.daemon = True
+        self.robotConfHandler.start()
 
-	def createDrakeSimulationCommand(self, world, fixedRobot, objectConfs, fixedObjects):                
+        self.drakeSimulation = subprocess.Popen(
+            'cd ' +
+            interface_build_path +
+            '; ' +
+            'exec ' +
+            self.createDrakeSimulationCommand(),
+            shell=True)
 
-		def convertToDrakePose(pose):
-			return pose.x, pose.y, pose.z, 0, 0, pose.theta
+        while self.robotConfUpdatedByDrake is False:
+            time.sleep(0.1)
 
-		def bhpnToDrakeObject(obj):
-			path_to_objects = interface_path + 'object_conversion_utils/'
-			shapes.writeOff(world.objectShapes[obj], path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
-                	bhpn_to_drake_object.convert(path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
+        atexit.register(self.release)
+        print 'Initialized the bhpn-drake interface.'
 
-    		command = interface_build_path + 'simulation '
-                command += str(self.robotConnection.getNumJoints()) + ' '
-                for joint in self.robotConnection.toDrakeRobotConf(self.bhpnRobotConf).joint_position:
-                    command += str(joint) + ' '
-		command += self.robotConnection.getInsertionArguments()
-		command += '0 0 0 0 0 0 '
-		command += str(fixedRobot).lower() + ' '
+    ############# Initialization/Destruction methods ##########################
 
-		for obj in world.objects:
-			if obj in objectConfs:
-				fixed = 'false '
-				if obj in fixedObjects:
-					fixed = 'true '
-				bhpnToDrakeObject(obj)
-				command += '/examples/bhpn_drake_interface/object_conversion_utils/generated_drake_objects/' + obj + '.urdf '
-				objDrakePose = convertToDrakePose(objectConfs[obj][obj][0])
-				for value in objDrakePose:
-					command += str(value) + ' '
-				command += fixed
-		print 'command: ', command
-		return command
-		
+    def release(self):
+        print 'Attempting to terminate the bhpn-drake interface.'
+        self.handlerPoisonPill = True
+        self.robotConfHandler.join()
+        self.drakeSimulation.terminate()
+        returncode = self.drakeSimulation.wait()
+        print "Returncode of simulation: ", returncode
+        print 'Terminated the bhpn-drake interface.'
 
-	def commandDrakeRobotConf(self, bhpnConf, threshold):
-                msg = self.robotConnection.toDrakeRobotConf(bhpnConf)
-                print 'Attempting to move drake robot to bhpn commanded configuration.'
-                self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
-		while max(map(abs, map(sub, msg.joint_position, self.drakeRobotConf.joint_position))) >= threshold:
-			time.sleep(0.1)
-                        self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())           
-                print 'Moved drake robot to bhpn commanded configuration.'
+    def createDrakeObjectFiles(self):
+        objectFiles = {}
+        for obj in self.world.objects:
+            path_to_objects = interface_path + 'object_conversion_utils/'
+            shapes.writeOff(
+                self.world.objectShapes[obj],
+                path_to_objects +
+                'generated_bhpn_objects/' +
+                obj +
+                '.off')
+            bhpn_to_drake_object.convert(
+                path_to_objects + 'generated_bhpn_objects/' + obj + '.off')
+            objectFiles[obj] = '/examples/bhpn_drake_interface/object_conversion_utils/generated_drake_objects/' + obj + '.urdf '
+        return objectFiles
 
+    def createDrakeSimulationCommand(self):
+        command = interface_build_path + 'simulation '
+        command += str(self.robotConnection.getNumJoints()) + ' '
+        for joint in self.robotConnection.toDrakeRobotConf(
+                self.bhpnRobotConf).joint_position:
+            command += str(joint) + ' '
+        command += self.robotName + ' '
+        command += self.robotConnection.getUrdfPath() + ' '
+        for value in self.convertToDrakePose(self.initialBhpnRobotPose):
+            command += str(value) + ' '
+        command += str(self.robotFixed).lower() + ' '
+        for obj in self.objectFiles:
+            command += self.objectFiles[obj]
+            for value in self.convertToDrakePose(
+                    self.bhpnObjectConfs[obj][obj][0]):
+                command += str(value) + ' '
+            if obj in self.fixedObjects:
+                command += 'true '
+            else:
+                command += 'false '
+        print 'Created drake simulation command: ', command
+        return command
 
-	def getBhpnRobotConf(self):
-    		return self.bhpnRobotConf.copy()
+    ######### Simulation command methods ######################################
 
-	def getDrakeSimulationWorld(self):
-		return self.drakeSimulationWorld.copy()
-		
-	def getDrakeSimulationFixedObjects(self):
-		return self.drakeSimulationFixedObjects.copy()
+    def commandDrakeRobotConf(self, bhpnConf, threshold, waitTime=10):
+        msg = self.robotConnection.toDrakeRobotConf(bhpnConf)
+        print 'Attempting to move drake robot to bhpn commanded configuration.'
+        self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
+        while max(map(abs, map(sub, msg.joint_position,
+                               self.drakeRobotConf.joint_position))) >= threshold:
+            time.sleep(0.1)
+            self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
+        print 'Moved drake robot to bhpn commanded configuration.'
 
-	def robotConfCallback(self, channel, data):
-		self.drakeRobotConf = lcmt_robot_state.decode(data)
-                self.bhpnRobotConf = self.robotConnection.toBhpnRobotConf(self.drakeRobotConf)
-                self.robotConfUpdatedByDrake = True
-                               
-        def getBhpnObjectConfs(self):
-            return self.bhpnObjectConfs.copy()
-                                
-        def objectPoseCallback(self, channel, data):
-                msg = lcmt_viewer_draw.decode(data)
-                
-                for obj in self.bhpnObjectConfs:
-                    self.bhpnObjectConfs[obj] = self.convertToBhpnPose(msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
-                                
-        def convertToBhpnPose(self, position, orientation):
-                return hu.Pose(position[0], position[1], position[2], 2*math.acos(orientation[0]))
-		
+    ######### Getter methods ##################################################
 
-	def handleLcmSubscribers(self):
-		while not self.handlerPoisonPill:
-			self.lc.handle()    
+    def getBhpnRobotConf(self):
+        return self.bhpnRobotConf.copy()
+
+    def getBhpnObjectConfs(self):
+        return self.bhpnObjectConfs.copy()
+
+    ######### LCM methods #####################################################
+
+    def handleLcmSubscribers(self):
+        while not self.handlerPoisonPill:
+            self.lc.handle()
+
+    def robotConfCallback(self, channel, data):
+        self.drakeRobotConf = lcmt_robot_state.decode(data)
+        self.bhpnRobotConf = self.robotConnection.toBhpnRobotConf(
+            self.drakeRobotConf)
+        self.robotConfUpdatedByDrake = True
+
+    def objectPoseCallback(self, channel, data):
+        msg = lcmt_viewer_draw.decode(data)
+
+        for obj in self.bhpnObjectConfs:
+            self.drakePosesXYZRPY[obj] = list(msg.position[msg.link_name.index(
+                obj)]) + self.convertFromQuaternionToRPY(msg.quaternion[msg.link_name.index(obj)])
+            self.bhpnObjectConfs[obj] = self.convertToBhpnPose(
+                msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
+        self.drakePosesXYZRPY[self.robotName] = [
+            0, 0, 0, 0, 0, 0]  # TODO: fix this!
+
+    ######### Conversion utility methods ######################################
+
+    def convertToBhpnPose(self, position, orientation):
+        return hu.Pose(
+            position[0],
+            position[1],
+            position[2],
+            2 *
+            math.acos(
+                orientation[0]))
+
+    def convertToDrakePose(self, pose):
+        return [pose.x, pose.y, pose.z, 0, 0, pose.theta]
+
+    def convertFromQuaternionToRPY(self, quaternion):
+        x = quaternion[0]
+        y = quaternion[1]
+        z = quaternion[2]
+        w = quaternion[3]
+
+        ysqr = y * y
+
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + ysqr)
+        r = math.degrees(math.atan2(t0, t1))
+
+        t2 = +2.0 * (w * y - z * x)
+        t2 = 1 if t2 > 1 else t2
+        t2 = -1 if t2 < -1 else t2
+        p = math.degrees(math.asin(t2))
+
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (ysqr + z * z)
+        y = math.degrees(math.atan2(t3, t4))
+        return [r, p, y]
+
+    ######### IK planner methods  ############################################
+
+    def simpleIkTrajPlanner(self, t, constraints):
+        world_tree = self.kinematicsSnapshot()
+        q_seed = np.array(self.drakeRobotConf.joint_position)
+        q_seed_array = np.transpose(np.array([q_seed, q_seed]))[0]
+        options = ik.IKoptions(robot)
+        return ik.InverseKinTraj(
+            world_tree,
+            t,
+            q_seed_array,
+            q_seed_array,
+            constraints,
+            options)
+
+    def kinematicsSnapshot(self):
+        world_tree = pydrake.rbtree.RigidBodyTree()
+        for urdf_file, name in self.urdfToName.items():
+            urdf_string = open(urdf_file).read()
+            base_dir = os.path.dirname(urdf_file)
+            package_map = pydrake.rbtree.PackageMap()
+            pose = self.drakePosesXYZRPY[name]
+            weld_frame = pydrake.rbtree.RigidBodyFrame(
+                "world", None, np.array(pose[0:3]), np.array(pose[3:6]))
+            # TODO: ask whether making objects fixed and not including current
+            # forces will reduce robustness of ik planner (ex: does ik planner
+            # know that an object will fall to ground after a certian time,
+            # freeing up space?)
+            floating_base_type = pydrake.rbtree.kFixed
+            pydrake.rbtree.AddModelInstanceFromUrdfStringSearchingInRosPackages(
+                urdf_string,
+                package_map,
+                base_dir,
+                floating_base_type,
+                weld_frame,
+                world_tree)
+        return world_tree

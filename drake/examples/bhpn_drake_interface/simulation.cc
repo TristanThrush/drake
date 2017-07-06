@@ -1,11 +1,10 @@
 #include "drake/common/drake_path.h"
-#include "drake/examples/bhpn_drake_interface/lcm_utils/oracular_state_estimator.h"
+#include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 #include "drake/examples/bhpn_drake_interface/lcm_utils/robot_state_lcm.h"
 #include "drake/examples/bhpn_drake_interface/simulation_utils/sim_diagram_builder.h"
 #include "drake/examples/bhpn_drake_interface/simulation_utils/world_sim_tree_builder.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/lcmt_robot_state.hpp"
-#include "drake/lcmt_piecewise_polynomial.hpp"
 #include "drake/math/autodiff.h"
 #include "drake/math/roll_pitch_yaw.h"
 #include "drake/multibody/ik_options.h"
@@ -23,7 +22,6 @@
 #include "drake/systems/primitives/demultiplexer.h"
 #include "drake/systems/primitives/multiplexer.h"
 #include "drake/systems/primitives/trajectory_source.h"
-#include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 
 using Eigen::Vector2d;
 using Eigen::Vector3d;
@@ -61,14 +59,15 @@ std::unique_ptr<systems::PidController<double>> pr2_controller(
     systems::RigidBodyPlant<double>* plant) {
   int num_actuators = 21;
   VectorX<double> kp(num_actuators);
-  kp << 200000, 300, 300, 300, 300, 300, 300, 40, 40, 40, 40, 40, 300, 300, 300, 300, 40, 40, 40, 40, 40;
+  kp << 200000, 300, 300, 300, 300, 300, 300, 40, 40, 40, 40, 40, 300, 300, 300,
+      300, 40, 40, 40, 40, 40;
   kp *= 0.5;
   VectorX<double> ki(num_actuators);
   ki << 5, 5, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 5, 5, 5, 5, 0, 0, 0, 0, 0;
-  //ki *= 0;
+  // ki *= 0;
   VectorX<double> kd(num_actuators);
   kd << 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 0, 0;
-  //kd *= 0;
+  // kd *= 0;
   auto Binv = plant->get_rigid_body_tree()
                   .B.block(0, 0, num_actuators, num_actuators)
                   .inverse();
@@ -127,8 +126,8 @@ void main(int argc, char* argv[]) {
   int num_actuators = std::stoi(argv[1]);
   std::string robot_name(argv[num_actuators + 2]);
 
-  for(int index = 2; index < num_actuators + 2; index ++){
-	initial_joint_positions.push_back(std::stod(argv[index]));
+  for (int index = 2; index < num_actuators + 2; index++) {
+    initial_joint_positions.push_back(std::stod(argv[index]));
   }
 
   for (int index = num_actuators + 3; index < argc; index++) {
@@ -159,14 +158,15 @@ void main(int argc, char* argv[]) {
       builder.get_mutable_builder();
   systems::RigidBodyPlant<double>* plant = builder.AddPlant(
       build_world_tree(&world_info, urdf_paths, poses_xyz, poses_rpy, fixed));
-  //auto num_actuators = plant->get_rigid_body_tree().get_num_actuators();
+  // auto num_actuators = plant->get_rigid_body_tree().get_num_actuators();
   std::cout << "num_actuators: " << num_actuators << "\n";
-  std::cout << "actuators: " << "\n";
-  for (RigidBodyActuator actuator : plant->get_rigid_body_tree().actuators){
-	std::cout << actuator.name_ << "\n";
+  std::cout << "actuators: "
+            << "\n";
+  for (RigidBodyActuator actuator : plant->get_rigid_body_tree().actuators) {
+    std::cout << actuator.name_ << "\n";
   }
   builder.AddVisualizer(&lcm);
-  
+
   // set up communication with BHPN
   auto command_sub = diagram_builder->AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<lcmt_robot_state>(
@@ -175,16 +175,18 @@ void main(int argc, char* argv[]) {
   auto command_receiver =
       diagram_builder->AddSystem<RobotStateReceiver>(num_actuators);
   command_receiver->set_name("command_receiver");
-  
+
   /*
   auto command_sub = diagram_builder->AddSystem(
-	systems::lcm::LcmSubscriberSystem::Make<lcmt_piecewise_polynomial>(
-		"TRAJECTORY_COMMAND", &lcm));
-	command_sub->set_name("command_subscriber");
-  auto piecewise_polynomial_value = command_sub->get_output_port(0).Calc(*command_sub->CreateDefaultContext().get(), &command_sub->get_output_port(0).Allocate(*command_sub->CreateDefaultContext().get())).GetValue<lcmt_piecewise_polynomial>();
-  auto command_receiver = 
-	diagram_builder->AddSystem<systems::TrajectorySource<double>>(PiecewisePolynomialTrajectory(decodePiecewisePolynomial(piecewise_polynomial_value)), 1);
-	command_receiver->set_name("command_reciever");
+        systems::lcm::LcmSubscriberSystem::Make<lcmt_piecewise_polynomial>(
+                "TRAJECTORY_COMMAND", &lcm));
+        command_sub->set_name("command_subscriber");
+  auto piecewise_polynomial_value =
+  command_sub->get_output_port(0).Calc(*command_sub->CreateDefaultContext().get(),
+  &command_sub->get_output_port(0).Allocate(*command_sub->CreateDefaultContext().get())).GetValue<lcmt_piecewise_polynomial>();
+  auto command_receiver =
+        diagram_builder->AddSystem<systems::TrajectorySource<double>>(PiecewisePolynomialTrajectory(decodePiecewisePolynomial(piecewise_polynomial_value)),
+  1); command_receiver->set_name("command_reciever");
 */
   auto status_pub = diagram_builder->AddSystem(
       systems::lcm::LcmPublisherSystem::Make<lcmt_robot_state>(
@@ -260,15 +262,20 @@ void main(int argc, char* argv[]) {
                            status_sender->get_command_input_port());
   diagram_builder->Connect(status_sender->get_output_port(0),
                            status_pub->get_input_port(0));
-  
+
   // start the simulation
   lcm.StartReceiveThread();
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
   systems::Simulator<double> simulator(*diagram);
-  for(int index = 0; index < num_actuators; index++){
-     simulator.get_mutable_context()->get_mutable_continuous_state_vector()->SetAtIndex(index, initial_joint_positions[index]);
+  for (int index = 0; index < num_actuators; index++) {
+    simulator.get_mutable_context()
+        ->get_mutable_continuous_state_vector()
+        ->SetAtIndex(index, initial_joint_positions[index]);
   }
-  std::cout << simulator.get_mutable_context()->get_mutable_continuous_state_vector()->CopyToVector() << "\n";
+  std::cout << simulator.get_mutable_context()
+                   ->get_mutable_continuous_state_vector()
+                   ->CopyToVector()
+            << "\n";
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
   simulator.StepTo(5000000000);

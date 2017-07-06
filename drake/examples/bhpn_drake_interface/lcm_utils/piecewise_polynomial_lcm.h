@@ -11,34 +11,33 @@
 #include "drake/systems/framework/leaf_system.h"
 
 namespace drake {
-    namespace examples {
-        namespace bhpn_drake_interface {
+namespace examples {
+namespace bhpn_drake_interface {
 
-            extern const double lcmStatusPeriod;
+extern const double lcmStatusPeriod;
 
-            class PiecewisePolynomialReceiver : public systems::LeafSystem<double> {
-            public:
-                DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(PiecewisePolynomialReceiver)
+class PiecewisePolynomialReceiver : public systems::LeafSystem<double> {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(PiecewisePolynomialReceiver)
 
-                explicit PiecewisePolynomialReceiver(num_joints);
+  explicit PiecewisePolynomialReceiver(num_joints);
 
-                void set_initial_position(
-                        systems::Context<double> *context,
-                        const Eigen::Ref<const VectorX<double>> x) const;
+  void set_initial_position(systems::Context<double>* context,
+                            const Eigen::Ref<const VectorX<double>> x) const;
 
-            private:
-                void OutputCommand(const systems::Context<double> &context,
-                                   systems::BasicVector<double> *output) const;
+ private:
+  void OutputCommand(const systems::Context<double>& context,
+                     systems::BasicVector<double>* output) const;
 
-                void DoCalcDiscreteVariableUpdates(
-                        const systems::Context<double> &context,
-			const std::vector<const systems::DiscreteUpdateEvent<double>*>&,
-                        systems::DiscreteValues<double> *discrete_state) const override;
+  void DoCalcDiscreteVariableUpdates(
+      const systems::Context<double>& context,
+      const std::vector<const systems::DiscreteUpdateEvent<double>*>&,
+      systems::DiscreteValues<double>* discrete_state) const override;
 
-            private:
-                const int num_joints_;
-            };
+ private:
+  const int num_joints_;
+};
 
-        }  // namespace bhpn_drake_interface
-    }  // namespace examples
+}  // namespace bhpn_drake_interface
+}  // namespace examples
 }  // namespace drake
