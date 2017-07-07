@@ -1,4 +1,4 @@
-#include "drake/examples/bhpn_drake_interface/lcm_utils/robot_state_lcm.h"
+#include "drake/examples/bhpn_drake_interface/lcm_utils/piecewise_polynomial_lcm.h"
 
 #include "drake/common/drake_assert.h"
 #include "drake/lcmt_robot_state.hpp"
@@ -45,20 +45,24 @@ void PiecewisePolynomialReceiver::DoCalcDiscreteVariableUpdates(
       PiecewisePolynomialTrajectory(piecewise_polynomial);
   const auto& trajectory_source =
       TrajectorySource<double>(*piecewise_polynomial_trajectory, 1);
+  Eigen::VectorBlock<VectorX<double>>* output;
+  trajectory_source.DoCalcVectorOutput(context, output);
+  
   // If we're using a default constructed message (haven't received
   // a command yet), keep using the initial state.
-  if (trajectory_source.get_output_port().size() != 0) {
-    DRAKE_DEMAND(command.get_output_port().size() == num_joints_);
+  if (output.size() != 0) {
+    DRAKE_DEMAND(output.size() == num_joints_);
+    /*
     VectorX<double> new_positions(num_joints_);
     for (int i = 0; i < command.num_joints; ++i) {
       new_positions(i) = command.joint_position[i];
     }
-
+    */
     BasicVector<double>* state = discrete_state->get_mutable_vector(0);
     auto state_value = state->get_mutable_value();
     state_value.tail(num_joints_) =
         (new_positions - state_value.head(num_joints_)) / lcmStatusPeriod;
-    state_value.head(num_joints_) = new_positions;
+    state_value.head(num_joints_) = output;
   }
 }
 
