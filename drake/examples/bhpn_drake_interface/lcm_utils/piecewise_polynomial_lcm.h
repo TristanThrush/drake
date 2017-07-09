@@ -14,13 +14,13 @@ namespace drake {
 namespace examples {
 namespace bhpn_drake_interface {
 
-extern const double lcmStatusPeriod;
+
 
 class PiecewisePolynomialReceiver : public systems::LeafSystem<double> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(PiecewisePolynomialReceiver)
 
-  explicit PiecewisePolynomialReceiver(num_joints);
+  explicit PiecewisePolynomialReceiver(int num_joints);
 
   void set_initial_position(systems::Context<double>* context,
                             const Eigen::Ref<const VectorX<double>> x) const;

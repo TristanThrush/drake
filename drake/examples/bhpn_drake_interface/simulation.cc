@@ -1,9 +1,16 @@
+#include <thread>
+#include <lcm/lcm-cpp.hpp>
+#include <unistd.h>
+
 #include "drake/common/drake_path.h"
+#include "drake/common/trajectories/piecewise_polynomial.h"
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
+#include "drake/examples/bhpn_drake_interface/lcm_utils/piecewise_polynomial_lcm.h"
 #include "drake/examples/bhpn_drake_interface/lcm_utils/robot_state_lcm.h"
 #include "drake/examples/bhpn_drake_interface/simulation_utils/sim_diagram_builder.h"
 #include "drake/examples/bhpn_drake_interface/simulation_utils/world_sim_tree_builder.h"
 #include "drake/lcm/drake_lcm.h"
+#include "drake/lcmt_piecewise_polynomial.hpp"
 #include "drake/lcmt_robot_state.hpp"
 #include "drake/math/autodiff.h"
 #include "drake/math/roll_pitch_yaw.h"
@@ -22,12 +29,47 @@
 #include "drake/systems/primitives/demultiplexer.h"
 #include "drake/systems/primitives/multiplexer.h"
 #include "drake/systems/primitives/trajectory_source.h"
+#include "drake/util/lcmUtil.h"
+
+#include "drake/lcmt_contact_results_for_viz.hpp"
+#include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
+#include "drake/systems/lcm/lcm_publisher_system.h"
 
 using Eigen::Vector2d;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 using Eigen::VectorXi;
 using Eigen::MatrixXd;
+
+std::vector<double> perfect_controller_desired_joint_positions;
+volatile bool perfect_control_poison_pill = false;
+
+class Handler {
+ public:
+  ~Handler() {}
+
+  void handleMessage(const lcm::ReceiveBuffer* rbuf, const std::string& chan,
+                     const drake::lcmt_robot_state* msg) {
+    for (int index = 0; index < (int)msg->joint_position.size(); index++) {
+      perfect_controller_desired_joint_positions[index] =
+          msg->joint_position[index];
+    }
+  }
+};
+
+int perfect_controller_command_reciever() {
+  lcm::LCM lcm;
+  if (!lcm.good()) {
+    return 1;
+  }
+  Handler handlerObject;
+  lcm.subscribe("BHPN_ROBOT_STATE_COMMAND", &Handler::handleMessage,
+                &handlerObject);
+
+  while (0 == lcm.handle());
+
+  return 0;
+}
 
 namespace drake {
 namespace examples {
@@ -59,15 +101,15 @@ std::unique_ptr<systems::PidController<double>> pr2_controller(
     systems::RigidBodyPlant<double>* plant) {
   int num_actuators = 21;
   VectorX<double> kp(num_actuators);
-  kp << 200000, 300, 300, 300, 300, 300, 300, 40, 40, 40, 40, 40, 300, 300, 300,
-      300, 40, 40, 40, 40, 40;
+  kp << 800000, 300, 300, 300, 300, 300, 300, 40, 40, 40, 80, 40, 300, 300, 300,
+      300, 40, 40, 80, 40, 40;
   kp *= 0.5;
   VectorX<double> ki(num_actuators);
-  ki << 5, 5, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 5, 5, 5, 5, 0, 0, 0, 0, 0;
+  ki << 50000, 5, 5, 5, 5, 5, 5, 1, 1, 0, 0, 0, 5, 5, 5, 5, 1, 1, 0, 0, 0;
   // ki *= 0;
   VectorX<double> kd(num_actuators);
-  kd << 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 0, 0;
-  // kd *= 0;
+  kd << 7, 7, 7, 7, 7, 7, 7, 2, 2, 1, 0, 0, 7, 7, 7, 7, 2, 2, 1, 0, 0;
+  kd *= 0.7;
   auto Binv = plant->get_rigid_body_tree()
                   .B.block(0, 0, num_actuators, num_actuators)
                   .inverse();
@@ -116,6 +158,19 @@ std::unique_ptr<RigidBodyTree<double>> build_world_tree(
   return tree_builder->Build();
 }
 
+void perfect_controller(systems::Context<double>* context,
+                        systems::RigidBodyPlant<double>* plant) {
+  while (!perfect_control_poison_pill) {
+    for (int index = 0;
+         index < plant->get_rigid_body_tree().get_num_actuators(); index++) {
+	if(index != 19 and index != 20 and index != 10 and index != 11){//TODO: make this more general. these indexes are only suitable for the pr2	
+      plant->set_position(context, index,
+                          perfect_controller_desired_joint_positions[index]);
+     }
+}
+  }
+}
+
 void main(int argc, char* argv[]) {
   // parse the arguments
   std::vector<std::string> urdf_paths;
@@ -123,14 +178,15 @@ void main(int argc, char* argv[]) {
   std::vector<Vector3d> poses_rpy;
   std::vector<std::string> fixed;
   std::vector<double> initial_joint_positions;
-  int num_actuators = std::stoi(argv[1]);
-  std::string robot_name(argv[num_actuators + 2]);
+  std::string perfect_control = std::string(argv[1]);
+  int num_actuators = std::stoi(argv[2]);
+  std::string robot_name(argv[num_actuators + 3]);
 
-  for (int index = 2; index < num_actuators + 2; index++) {
+  for (int index = 3; index < num_actuators + 3; index++) {
     initial_joint_positions.push_back(std::stod(argv[index]));
   }
 
-  for (int index = num_actuators + 3; index < argc; index++) {
+  for (int index = num_actuators + 4; index < argc; index++) {
     urdf_paths.push_back(argv[index]);
     index++;
     double x = std::stod(argv[index]);
@@ -158,7 +214,6 @@ void main(int argc, char* argv[]) {
       builder.get_mutable_builder();
   systems::RigidBodyPlant<double>* plant = builder.AddPlant(
       build_world_tree(&world_info, urdf_paths, poses_xyz, poses_rpy, fixed));
-  // auto num_actuators = plant->get_rigid_body_tree().get_num_actuators();
   std::cout << "num_actuators: " << num_actuators << "\n";
   std::cout << "actuators: "
             << "\n";
@@ -176,18 +231,6 @@ void main(int argc, char* argv[]) {
       diagram_builder->AddSystem<RobotStateReceiver>(num_actuators);
   command_receiver->set_name("command_receiver");
 
-  /*
-  auto command_sub = diagram_builder->AddSystem(
-        systems::lcm::LcmSubscriberSystem::Make<lcmt_piecewise_polynomial>(
-                "TRAJECTORY_COMMAND", &lcm));
-        command_sub->set_name("command_subscriber");
-  auto piecewise_polynomial_value =
-  command_sub->get_output_port(0).Calc(*command_sub->CreateDefaultContext().get(),
-  &command_sub->get_output_port(0).Allocate(*command_sub->CreateDefaultContext().get())).GetValue<lcmt_piecewise_polynomial>();
-  auto command_receiver =
-        diagram_builder->AddSystem<systems::TrajectorySource<double>>(PiecewisePolynomialTrajectory(decodePiecewisePolynomial(piecewise_polynomial_value)),
-  1); command_receiver->set_name("command_reciever");
-*/
   auto status_pub = diagram_builder->AddSystem(
       systems::lcm::LcmPublisherSystem::Make<lcmt_robot_state>(
           "DRAKE_ROBOT_STATE", &lcm));
@@ -263,19 +306,35 @@ void main(int argc, char* argv[]) {
   diagram_builder->Connect(status_sender->get_output_port(0),
                            status_pub->get_input_port(0));
 
+  // publish the contact results
+  auto contact_viz =
+      diagram_builder->AddSystem<systems::ContactResultsToLcmSystem<double>>(
+          plant->get_rigid_body_tree());
+  auto contact_results_publisher = diagram_builder->AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<lcmt_contact_results_for_viz>(
+          "CONTACT_RESULTS", &lcm));
+
+  diagram_builder->Connect(plant->contact_results_output_port(),
+                           contact_viz->get_input_port(0));
+  diagram_builder->Connect(contact_viz->get_output_port(0),
+                           contact_results_publisher->get_input_port(0));
+
   // start the simulation
   lcm.StartReceiveThread();
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
   systems::Simulator<double> simulator(*diagram);
-  for (int index = 0; index < num_actuators; index++) {
-    simulator.get_mutable_context()
-        ->get_mutable_continuous_state_vector()
-        ->SetAtIndex(index, initial_joint_positions[index]);
+  auto context = simulator.get_mutable_context();
+  for (int index = 0;
+         index < plant->get_rigid_body_tree().get_num_actuators(); index++) {
+      plant->set_position(context, index,
+                          initial_joint_positions[index]);
   }
-  std::cout << simulator.get_mutable_context()
-                   ->get_mutable_continuous_state_vector()
-                   ->CopyToVector()
-            << "\n";
+  perfect_control_poison_pill = perfect_control.compare("true");
+  perfect_controller_desired_joint_positions = initial_joint_positions;
+  std::thread c(perfect_controller, context, plant);
+  std::thread r(perfect_controller_command_reciever);
+ 
+
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
   simulator.StepTo(5000000000);

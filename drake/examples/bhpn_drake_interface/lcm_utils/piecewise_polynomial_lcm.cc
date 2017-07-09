@@ -1,7 +1,11 @@
 #include "drake/examples/bhpn_drake_interface/lcm_utils/piecewise_polynomial_lcm.h"
 
 #include "drake/common/drake_assert.h"
-#include "drake/lcmt_robot_state.hpp"
+#include "drake/lcmt_piecewise_polynomial.hpp"
+#include "drake/util/lcmUtil.h"
+#include "drake/systems/primitives/trajectory_source.h"
+#include "drake/common/trajectories/piecewise_polynomial.h"
+#include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 
 namespace drake {
 namespace examples {
@@ -40,18 +44,27 @@ void PiecewisePolynomialReceiver::DoCalcDiscreteVariableUpdates(
   const systems::AbstractValue* input = this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(input != nullptr);
   const auto& msg = input->GetValue<lcmt_piecewise_polynomial>();
-  const auto& piecewise_polynomial = decodePiecewisePolynomial(msg);
-  const auto& piecewise_polynomial_trajectory =
-      PiecewisePolynomialTrajectory(piecewise_polynomial);
-  const auto& trajectory_source =
-      TrajectorySource<double>(*piecewise_polynomial_trajectory, 1);
-  Eigen::VectorBlock<VectorX<double>>* output;
-  trajectory_source.DoCalcVectorOutput(context, output);
   
+  std::cout << "yo" << "\n";
+  
+  //Eigen::VectorXd output_vector(21);
+  //output_vector << 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+  //const auto& trajectory_source =
+      //systems::TrajectorySource<double>(piecewise_polynomial_trajectory, 1);
+  //Eigen::VectorBlock<VectorX<double>>* output;
+  //trajectory_source.DoCalcVectorOutput(context, output);
+  //auto output = trajectory_source.AllocateOutput(context);
+  //auto output = trajectory_source.get_output_port().Allocate(context);
+  //trajectory_source.get_output_port().Calc(context, output.get());
   // If we're using a default constructed message (haven't received
   // a command yet), keep using the initial state.
-  if (output.size() != 0) {
-    DRAKE_DEMAND(output.size() == num_joints_);
+  //const auto& output_vector = output->GetValueOrThrow<BasicVector<double>>().CopyToVector();
+  //std::cout << "size: " << output_vector.size() << "\n";
+  if (msg.timestamp != 0) {
+    const auto& piecewise_polynomial = decodePiecewisePolynomial(msg);
+    const auto& piecewise_polynomial_trajectory = PiecewisePolynomialTrajectory(piecewise_polynomial);
+    const auto& output_vector = piecewise_polynomial_trajectory.value(context.get_time());
+    DRAKE_DEMAND(output_vector.size() == num_joints_);
     /*
     VectorX<double> new_positions(num_joints_);
     for (int i = 0; i < command.num_joints; ++i) {
@@ -61,8 +74,8 @@ void PiecewisePolynomialReceiver::DoCalcDiscreteVariableUpdates(
     BasicVector<double>* state = discrete_state->get_mutable_vector(0);
     auto state_value = state->get_mutable_value();
     state_value.tail(num_joints_) =
-        (new_positions - state_value.head(num_joints_)) / lcmStatusPeriod;
-    state_value.head(num_joints_) = output;
+        (output_vector - state_value.head(num_joints_)) / lcmStatusPeriod;
+    state_value.head(num_joints_) = output_vector;
   }
 }
 
