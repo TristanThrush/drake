@@ -41,7 +41,8 @@ using Eigen::VectorXd;
 using Eigen::VectorXi;
 using Eigen::MatrixXd;
 
-std::vector<double> perfect_controller_desired_joint_positions;
+std::vector<double> perfect_controller_desired_positions;
+std::vector<double> perfect_holder_desired_positions;
 volatile bool perfect_control_poison_pill = false;
 
 class Handler {
@@ -51,11 +52,28 @@ class Handler {
   void handleMessage(const lcm::ReceiveBuffer* rbuf, const std::string& chan,
                      const drake::lcmt_robot_state* msg) {
     for (int index = 0; index < (int)msg->joint_position.size(); index++) {
-      perfect_controller_desired_joint_positions[index] =
+      perfect_controller_desired_positions[index] =
           msg->joint_position[index];
     }
   }
 };
+
+class HandlerPerfectHold {
+ public:
+  ~HandlerPerfectHold() {}
+
+  void handleMessage(const lcm::ReceiveBuffer* rbuf, const std::string& chan,
+                     const drake::lcmt_robot_state* msg) {
+    int index2 = 2;
+    std::cout << msg->joint_position[0] << " " << msg->joint_position[1] << "\n";
+    for (int index = msg->joint_position[0]; index < (int)msg->joint_position[1]; index++) {
+      perfect_controller_desired_positions[index] =
+          msg->joint_position[index2];
+	index2 ++;
+    }
+  }
+};
+
 
 int perfect_controller_command_reciever() {
   lcm::LCM lcm;
@@ -65,11 +83,24 @@ int perfect_controller_command_reciever() {
   Handler handlerObject;
   lcm.subscribe("BHPN_ROBOT_STATE_COMMAND", &Handler::handleMessage,
                 &handlerObject);
+   while (0 == lcm.handle());
+
+  return 0;
+}
+
+int perfect_holder_command_reciever() {
+  lcm::LCM lcm;
+  if (!lcm.good()) {
+    return 1;
+  }
+  HandlerPerfectHold handlerPerfectHoldObject;
+  lcm.subscribe("PERFECT_HOLD_STATE", &HandlerPerfectHold::handleMessage, &handlerPerfectHoldObject);
 
   while (0 == lcm.handle());
 
   return 0;
 }
+
 
 namespace drake {
 namespace examples {
@@ -101,15 +132,15 @@ std::unique_ptr<systems::PidController<double>> pr2_controller(
     systems::RigidBodyPlant<double>* plant) {
   int num_actuators = 21;
   VectorX<double> kp(num_actuators);
-  kp << 800000, 300, 300, 300, 300, 300, 300, 40, 40, 40, 80, 40, 300, 300, 300,
-      300, 40, 40, 80, 40, 40;
+  kp << 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 80, 80, 40, 40, 4000, 4100, 2000,
+      2000, 300, 80, 80, 40, 40;
   kp *= 0.5;
   VectorX<double> ki(num_actuators);
-  ki << 50000, 5, 5, 5, 5, 5, 5, 1, 1, 0, 0, 0, 5, 5, 5, 5, 1, 1, 0, 0, 0;
-  // ki *= 0;
+  ki << 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15;
+  ki *= 0.3;
   VectorX<double> kd(num_actuators);
   kd << 7, 7, 7, 7, 7, 7, 7, 2, 2, 1, 0, 0, 7, 7, 7, 7, 2, 2, 1, 0, 0;
-  kd *= 0.7;
+  kd *= 0.1;
   auto Binv = plant->get_rigid_body_tree()
                   .B.block(0, 0, num_actuators, num_actuators)
                   .inverse();
@@ -165,7 +196,7 @@ void perfect_controller(systems::Context<double>* context,
          index < plant->get_rigid_body_tree().get_num_actuators(); index++) {
 	if(index != 19 and index != 20 and index != 10 and index != 11){//TODO: make this more general. these indexes are only suitable for the pr2	
       plant->set_position(context, index,
-                          perfect_controller_desired_joint_positions[index]);
+                          perfect_controller_desired_positions[index]);
      }
 }
   }
@@ -319,6 +350,16 @@ void main(int argc, char* argv[]) {
   diagram_builder->Connect(contact_viz->get_output_port(0),
                            contact_results_publisher->get_input_port(0));
 
+  //give the plant some contact parameters
+  const double kStiffness = 5000;
+  const double kDissipation = 2.0;
+  const double kStaticFriction = 3.7;
+  const double kDynamicFriction = 2.7; //1.5
+  const double kVStictionTolerance = 0.1;
+  plant->set_normal_contact_parameters(kStiffness, kDissipation);
+  plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
+                                         kVStictionTolerance);
+
   // start the simulation
   lcm.StartReceiveThread();
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
@@ -330,10 +371,11 @@ void main(int argc, char* argv[]) {
                           initial_joint_positions[index]);
   }
   perfect_control_poison_pill = perfect_control.compare("true");
-  perfect_controller_desired_joint_positions = initial_joint_positions;
+  perfect_controller_desired_positions = initial_joint_positions;
   std::thread c(perfect_controller, context, plant);
   std::thread r(perfect_controller_command_reciever);
- 
+  //std::thread h(perfect_holder_command_reciever);
+  std::cout<<"positions: " << plant->get_num_positions()<<"\n";
 
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
