@@ -16,13 +16,10 @@ import math
 import pydrake
 import numpy as np
 
-interface_path = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
-interface_build_path = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
-
-#'IIWA' : [('robotRightArm', 7)]
-
-#'IIWA' : 'iiwa /manipulation/models/iiwa_description/urdf/iiwa14_polytope_collision.urdf '
-
+interface_path = 'drake/examples/bhpn_drake_interface/'
+interface_build_path = 'drake/bazel-bin/drake/examples/bhpn_drake_interface/'
+interface_path_absolute = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
+interface_build_path_absolute = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
 
 class RobotBhpnDrakeConnection:
 
@@ -48,9 +45,9 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
         RobotBhpnDrakeConnection.__init__(self, bhpnRobotConf)
         self.robotName = 'pr2'
         self.numJoints = 21
-        self.urdfPath = '/examples/PR2/pr2_fixed.urdf'
-        self.moveThreshold = np.array([.015, .015, .015, .015, .015, .015, .015, .015, .010, .010, .030, .030, .015, .015, .015, .015, .015, .010, .010, .030, .030])
-        self.moveThreshold *= 5
+        self.urdfPath = 'drake/examples/PR2/pr2_fixed.urdf'
+        self.moveThreshold = np.array([.015, .015, .015, .015, .015, .015, .015, .015, .010, .010, .040, .040, .015, .015, .015, .015, .015, .010, .010, .040, .040])
+        self.moveThreshold *= 4
 
     def toBhpnRobotConf(self, drakeRobotConf):
         drake_joints = drakeRobotConf.joint_position
@@ -88,6 +85,9 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
     def getMoveThreshold(self):
         return self.moveThreshold.copy()
 
+    def handToEndEffector(self):
+        return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
+
     def grippedObjects(self, contact_results, objectsToCheck):
         gripper_end_effector_to_gripped_objects = {'l_gripper_palm_link':[], 'r_gripper_palm_link':[]}
         necessary_collisions_for_l_gripper_grip = set(['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link'])
@@ -118,7 +118,7 @@ class BhpnDrakeInterface:
             bhpnObjectConfs,
             fixedObjects,
             perfectControlAndObjectHolding = False,
-            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_object.off'), [1.57079,3.14159,0,0,0.1,0.05], 0.25)}
+            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57079,0,0,-0.09,0,-0.08], 0.25)}
             ):
         self.robotName = robotName.lower()
         supportedRobots = {'pr2': Pr2BhpnDrakeConnection}
@@ -163,15 +163,15 @@ class BhpnDrakeInterface:
             target=self.handleLcmSubscribers)
         self.robotConfHandler.daemon = True
         self.robotConfHandler.start()
-
+        
         self.drakeSimulation = subprocess.Popen(
             'cd ' +
-            interface_build_path +
+            interface_build_path_absolute +
             '; ' +
             'exec ' +
             self.createDrakeSimulationCommand(),
             shell=True)
-
+        
         while self.robotConfUpdatedByDrake is False and self.contactResults is None:
             time.sleep(0.1)
 
@@ -180,7 +180,6 @@ class BhpnDrakeInterface:
         self.perfectHoldSender.daemon = True
         self.perfectHoldSender.start()
 
-        print 'posesToDrakePositionIndices: ', self.drakePoseIndices
         atexit.register(self.release)
         print 'Initialized the bhpn-drake interface.'
 
@@ -203,12 +202,12 @@ class BhpnDrakeInterface:
             if obj not in self.replacementShapes:
                 shape = self.world.objectShapes[obj]
                 transform = [0,0,0,0,0,0]
-                mass = 5.0
+                mass = 6.0
             else:
                 shape = self.replacementShapes[obj][0]
                 transform = self.replacementShapes[obj][1]
-                mass = 1.0
-            path_to_objects = interface_path + 'object_conversion_utils/'
+                mass = 2.0
+            path_to_objects = interface_path_absolute + 'object_conversion_utils/'
             shapes.writeOff(
                 shape,
                 path_to_objects +
@@ -217,11 +216,11 @@ class BhpnDrakeInterface:
                 '.off')
             bhpn_to_drake_object.convert(
                 path_to_objects + 'generated_bhpn_objects/' + obj + '.off', transform, mass)
-            objectFiles[obj] = '/examples/bhpn_drake_interface/object_conversion_utils/generated_drake_objects/' + obj + '.urdf '
+            objectFiles[obj] = 'drake/examples/bhpn_drake_interface/object_conversion_utils/generated_drake_objects/' + obj + '.urdf '
         return objectFiles
 
     def createDrakeSimulationCommand(self):
-        command = interface_build_path + 'simulation '
+        command = interface_build_path_absolute + 'simulation '
         command += str(self.perfectControlAndObjectHolding).lower() + ' '
         command += str(self.robotConnection.getNumJoints()) + ' '
         for joint in self.robotConnection.toDrakeRobotConf(
@@ -276,8 +275,8 @@ class BhpnDrakeInterface:
     def getBhpnObjectConfs(self):
         return self.bhpnObjectConfs.copy()
 
-    def isGripped():
-        pass
+    def isGripped(self, hand, obj):
+        return obj in self.robotConnection.grippedObjects(self.contactResults, ['objA'])[self.robotConnection.handToEndEffector()[hand]]
 
     ######### LCM methods #####################################################
 
@@ -293,10 +292,17 @@ class BhpnDrakeInterface:
      
     def objectPoseCallback(self, channel, data):
         msg = lcmt_viewer_draw.decode(data)
-
         for obj in self.bhpnObjectConfs:
-            self.bhpnObjectConfs[obj] = self.convertToBhpnPose(
-                msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
+                if obj == 'objA':
+                    pose = self.convertToBhpnPose(
+                    msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
+                    
+                    pose.theta -= 1.57
+                    self.bhpnObjectConfs[obj] = pose
+                else:
+                    self.bhpnObjectConfs[obj] = self.convertToBhpnPose(
+                    msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
+
         #print self.bhpnObjectConfs
         for obj in msg.link_name:
             self.drakePosesXYZRPY[obj] = list(msg.position[msg.link_name.index(
@@ -308,18 +314,7 @@ class BhpnDrakeInterface:
         
 
     def contactResultsCallback(self, channel, data):
-        self.contactResults = lcmt_contact_results_for_viz.decode(data)
-        #TODO: remove the following
-        #print "active"
-        '''
-        for info in self.contactResults.contact_info:
-            #if info.body1_name == 'objA' and info.body2_name != 'tableIkea1':
-            if ('gripper' in info.body1_name and 'obj' in info.body2_name) or ('gripper' in info.body2_name and 'obj' in info.body1_name):
-                for i in range(1000000):
-                    print 'Contact: ', info.body1_name, info.body2_name
-            if 'tip' in info.body1_name:
-                print info.body1_name
-        '''                
+        self.contactResults = lcmt_contact_results_for_viz.decode(data)            
         
     ######### Conversion utility methods ######################################
 

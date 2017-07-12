@@ -2,7 +2,7 @@
 #include <lcm/lcm-cpp.hpp>
 #include <unistd.h>
 
-#include "drake/common/drake_path.h"
+#include "drake/common/find_resource.h"
 #include "drake/common/trajectories/piecewise_polynomial.h"
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 #include "drake/examples/bhpn_drake_interface/lcm_utils/piecewise_polynomial_lcm.h"
@@ -132,8 +132,8 @@ std::unique_ptr<systems::PidController<double>> pr2_controller(
     systems::RigidBodyPlant<double>* plant) {
   int num_actuators = 21;
   VectorX<double> kp(num_actuators);
-  kp << 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 80, 80, 40, 40, 4000, 4100, 2000,
-      2000, 300, 80, 80, 40, 40;
+  kp << 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 80, 80, 80, 80, 4000, 4100, 2000,
+      2000, 300, 80, 80, 80, 80;
   kp *= 0.5;
   VectorX<double> ki(num_actuators);
   ki << 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15;
@@ -353,9 +353,9 @@ void main(int argc, char* argv[]) {
   //give the plant some contact parameters
   const double kStiffness = 5000;
   const double kDissipation = 2.0;
-  const double kStaticFriction = 3.7;
-  const double kDynamicFriction = 2.7; //1.5
-  const double kVStictionTolerance = 0.1;
+  const double kStaticFriction = 4.7;
+  const double kDynamicFriction = 3.7; //1.5
+  const double kVStictionTolerance = 0.5;
   plant->set_normal_contact_parameters(kStiffness, kDissipation);
   plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                          kVStictionTolerance);

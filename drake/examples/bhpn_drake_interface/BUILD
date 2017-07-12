@@ -70,6 +70,7 @@ drake_cc_library(
     hdrs = ["simulation_utils/world_sim_tree_builder.h"],
     deps = [
         "//drake/common:unused",
+	"//drake/common:find_resource",
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody:rigid_body_tree_construction",
         "//drake/multibody/parsers",
@@ -98,6 +99,7 @@ drake_cc_binary(
 	"//drake/systems/primitives:multiplexer",
 	"//drake/common/trajectories:piecewise_polynomial_trajectory",
         "//drake/common/trajectories:piecewise_polynomial",
+	"//drake/common:find_resource",
 	"@com_github_gflags_gflags//:gflags",
     ],
 )
