@@ -817,7 +817,13 @@ void RigidBodyTree<T>::collisionDetectFromPoints(
     normal.col(i) = closest_points[i].normal;
     phi[i] = closest_points[i].distance;
     const DrakeCollision::Element* elementB = closest_points[i].elementB;
-    body_idx.push_back(elementB->get_body()->get_body_index());
+    // In the case that no closest point was found, elementB will come back
+    // as a null pointer which we should not attempt to access.
+    if (elementB) {
+      body_idx.push_back(elementB->get_body()->get_body_index());
+    } else {
+      body_idx.push_back(-1);
+    }
   }
 }
 
@@ -969,44 +975,6 @@ bool RigidBodyTree<T>::collisionDetect(
   }
   return collisionDetect(cache, phi, normal, xA, xB, bodyA_idx, bodyB_idx,
                          ids_to_check, use_margins);
-}
-
-template <typename T>
-void RigidBodyTree<T>::potentialCollisions(
-    const KinematicsCache<double>& cache,
-    // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-    VectorXd& phi, Matrix3Xd& normal,
-    // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-    Matrix3Xd& xA, Matrix3Xd& xB,
-    // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-    vector<int>& bodyA_idx,
-    // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-    vector<int>& bodyB_idx,
-    bool use_margins) {
-  updateDynamicCollisionElements(cache);
-  vector<DrakeCollision::PointPair> potential_collisions;
-  potential_collisions =
-      collision_model_->potentialCollisionPoints(use_margins);
-  size_t num_potential_collisions = potential_collisions.size();
-
-  phi = VectorXd::Zero(num_potential_collisions);
-  normal = MatrixXd::Zero(3, num_potential_collisions);
-  xA = Matrix3Xd(3, num_potential_collisions);
-  xB = Matrix3Xd(3, num_potential_collisions);
-
-  bodyA_idx.clear();
-  bodyB_idx.clear();
-
-  for (size_t i = 0; i < num_potential_collisions; ++i) {
-    const DrakeCollision::Element* elementA = potential_collisions[i].elementA;
-    const DrakeCollision::Element* elementB = potential_collisions[i].elementB;
-    xA.col(i) = potential_collisions[i].ptA;
-    xB.col(i) = potential_collisions[i].ptB;
-    normal.col(i) = potential_collisions[i].normal;
-    phi[i] = potential_collisions[i].distance;
-    bodyA_idx.push_back(elementA->get_body()->get_body_index());
-    bodyB_idx.push_back(elementB->get_body()->get_body_index());
-  }
 }
 
 template <typename T>

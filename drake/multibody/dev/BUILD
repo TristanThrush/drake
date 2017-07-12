@@ -20,11 +20,12 @@ drake_cc_library(
     ],
     deps = [
         "//drake/common:eigen_matrix_compare",
+        "//drake/common:find_resource",
         "//drake/multibody:global_inverse_kinematics",
         "//drake/multibody:inverse_kinematics",
         "//drake/multibody:rigid_body_tree_construction",
         "//drake/multibody/parsers",
-        "@gtest//:main",
+        "@gtest//:without_main",
     ],
 )
 

@@ -960,8 +960,31 @@ class RigidBodyTree {
                         bool use_margins = false);
 
   /**
-   * Computes the *signed* distance from the given points to the nearest body in
-   * the RigidBodyTree.
+   * Computes the *signed* distance from the given points to the nearest body
+   * in the RigidBodyTree.
+   *
+   * @param[in] cache a KinematicsCache constructed by
+   * RigidBodyTree::doKinematics given `q` and `v`.
+   * @param[in] points A 3xN matrix of points, in world frame, to which signed
+   * distance will be computed.
+   * @param[out] phi Resized to N elements and filled with the computed signed
+   * distances, or inf if no closest point was found.
+   * @param[out] normal Resized to 3xN elements and filled with collision
+   * element normals in world frame, at the closest point on the collision
+   * geometry to each point in `points`. Undefined where no closest point was
+   * found.
+   * @param[out] x Resized to 3xN elements and filled with the closest points
+   * on the collision geometry to each point in `points`, in world frame.
+   * Undefined where no closest point was found.
+   * @param[out] body_x Resized to 3xN elements and filled with the closest
+   * points on the collision geometry to each point in `points`, in the body
+   * frame of the closest body. Undefined where no closest point was found.
+   * @param[out] body_idx Resized to N elements and filled with the body idx
+   * of the closest body to each point in `points`, or -1 where no closest
+   * body was found.
+   * @param[in] use_margins Whether to pad each collision body with a narrow
+   * (see bullet_model) margin to improve stability of normal estimation at
+   * the cost of the accuracy of closest points calculations.
    */
   void collisionDetectFromPoints(
       const KinematicsCache<double>& cache,
@@ -1068,22 +1091,6 @@ class RigidBodyTree {
       Eigen::Matrix3Xd& ptsA,
       // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
       Eigen::Matrix3Xd& ptsB,
-      bool use_margins = true);
-
-  void potentialCollisions(
-      const KinematicsCache<double>& cache,
-      // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-      Eigen::VectorXd& phi,
-      // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-      Eigen::Matrix3Xd& normal,
-      // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-      Eigen::Matrix3Xd& xA,
-      // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-      Eigen::Matrix3Xd& xB,
-      // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-      std::vector<int>& bodyA_idx,
-      // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
-      std::vector<int>& bodyB_idx,
       bool use_margins = true);
 
   /** Computes the point of closest approach between bodies in the

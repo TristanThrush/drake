@@ -145,8 +145,8 @@ drake_cc_library(
         ":generated_vectors",
         ":idm_planner",
         ":pose_selector",
+        ":road_odometry",
         "//drake/automotive/maliput/api",
-        "//drake/math:saturate",
         "//drake/systems/rendering:pose_bundle",
         "//drake/systems/rendering:pose_vector",
     ],
@@ -195,6 +195,7 @@ drake_cc_library(
         ":idm_planner",
         ":lane_direction",
         ":pose_selector",
+        ":road_odometry",
         "//drake/automotive/maliput/api",
         "//drake/common:cond",
         "//drake/common:symbolic",
@@ -220,6 +221,8 @@ drake_cc_library(
     hdrs = ["pose_selector.h"],
     visibility = [],
     deps = [
+        ":lane_direction",
+        ":road_odometry",
         "//drake/automotive/maliput/api",
         "//drake/systems/rendering:pose_bundle",
         "//drake/systems/rendering:pose_vector",
@@ -233,7 +236,7 @@ drake_cc_library(
     data = ["//drake/automotive:models"],
     deps = [
         ":car_vis",
-        "//drake/common:drake_path",
+        "//drake/common:find_resource",
         "//drake/lcmtypes:viewer",
         "//drake/multibody/joints",
         "//drake/multibody/parsers",
@@ -250,7 +253,6 @@ drake_cc_library(
     deps = [
         ":generated_vectors",
         ":lane_direction",
-        ":pose_selector",
         "//drake/automotive/maliput/api",
         "//drake/common:cond",
         "//drake/common:symbolic",
@@ -266,9 +268,18 @@ drake_cc_library(
     deps = [
         ":generated_vectors",
         ":lane_direction",
-        ":pose_selector",
         ":pure_pursuit",
         "//drake/systems/rendering:pose_vector",
+    ],
+)
+
+drake_cc_library(
+    name = "road_odometry",
+    srcs = ["road_odometry.cc"],
+    hdrs = ["road_odometry.h"],
+    deps = [
+        "//drake/automotive/maliput/api",
+        "//drake/systems/rendering:frame_velocity",
     ],
 )
 
@@ -404,6 +415,7 @@ drake_cc_binary(
     test_rule_args = [" --simulation_sec=0.01"],
     deps = [
         ":automotive_simulator",
+        "//drake/common:find_resource",
         "//drake/common:text_logging_gflags",
         "//drake/multibody:rigid_body_tree_construction",
         "//drake/multibody/rigid_body_plant",
@@ -517,7 +529,6 @@ drake_cc_googletest(
         "//drake/automotive/maliput/api",
         "//drake/automotive/maliput/dragway",
         "//drake/automotive/maliput/monolane",
-        "//drake/common:drake_path",
         "//drake/common:eigen_matrix_compare",
         "//drake/math:geometric_transform",
     ],
@@ -567,6 +578,7 @@ drake_cc_googletest(
     deps = [
         "//drake/automotive:pose_selector",
         "//drake/automotive/maliput/dragway",
+        "//drake/automotive/maliput/monolane:builder",
     ],
 )
 

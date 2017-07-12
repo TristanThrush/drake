@@ -36,7 +36,6 @@
 #include "drake/solvers/function.h"
 #include "drake/solvers/indeterminate.h"
 #include "drake/solvers/mathematical_program_solver_interface.h"
-#include "drake/solvers/solver_type.h"
 
 namespace drake {
 namespace solvers {
@@ -1990,52 +1989,53 @@ class MathematicalProgram {
    * Manual, section 10.2 "Parameter Descriptions"
    * https://www.gurobi.com/documentation/6.5/refman/parameters.html
    */
-  void SetSolverOption(SolverType solver_type, const std::string& solver_option,
+  void SetSolverOption(const SolverId& solver_id,
+                       const std::string& solver_option,
                        double option_value) {
-    solver_options_double_[solver_type][solver_option] = option_value;
+    solver_options_double_[solver_id][solver_option] = option_value;
   }
 
-  void SetSolverOption(SolverType solver_type, const std::string& solver_option,
+  void SetSolverOption(const SolverId& solver_id,
+                       const std::string& solver_option,
                        int option_value) {
-    solver_options_int_[solver_type][solver_option] = option_value;
+    solver_options_int_[solver_id][solver_option] = option_value;
   }
 
-  void SetSolverOption(SolverType solver_type, const std::string& solver_option,
+  void SetSolverOption(const SolverId& solver_id,
+                       const std::string& solver_option,
                        const std::string& option_value) {
-    solver_options_str_[solver_type][solver_option] = option_value;
+    solver_options_str_[solver_id][solver_option] = option_value;
   }
 
   const std::map<std::string, double>& GetSolverOptionsDouble(
-      SolverType solver_type) {
-    return solver_options_double_[solver_type];
+      const SolverId& solver_id) {
+    return solver_options_double_[solver_id];
   }
 
   const std::map<std::string, int>& GetSolverOptionsInt(
-      SolverType solver_type) {
-    return solver_options_int_[solver_type];
+      const SolverId& solver_id) {
+    return solver_options_int_[solver_id];
   }
 
   const std::map<std::string, std::string>& GetSolverOptionsStr(
-      SolverType solver_type) {
-    return solver_options_str_[solver_type];
+      const SolverId& solver_id) {
+    return solver_options_str_[solver_id];
   }
 
-  DRAKE_DEPRECATED("Use GetSolverId() instead")
-  void GetSolverResult(SolverType* solver_type, int* solver_result) const {
-    *solver_type = *solver_type_;
-    *solver_result = solver_result_;
-  }
-
-  void SetSolverResult(SolverType solver_type, int solver_result) {
-    solver_type_ = solver_type;
-    solver_result_ = solver_result;
+  /**
+   * Sets the ID of the solver that was used to solve this program.
+   */
+  void SetSolverId(SolverId solver_id) {
+    solver_id_ = solver_id;
   }
 
   /**
    * Returns the ID of the solver that was used to solve this program.
    * Returns empty if Solve() has not been called.
    */
-  optional<SolverId> GetSolverId() const;
+  optional<SolverId> GetSolverId() const {
+    return solver_id_;
+  }
 
   /**
    * Getter for optimal cost at the solution. Will return NaN if there has
@@ -2305,12 +2305,11 @@ class MathematicalProgram {
   Eigen::VectorXd x_initial_guess_;
   std::vector<double> x_values_;
   std::shared_ptr<SolverData> solver_data_;
-  optional<SolverType> solver_type_;
-  int solver_result_{};
+  optional<SolverId> solver_id_;
   double optimal_cost_{};
-  std::map<SolverType, std::map<std::string, double>> solver_options_double_;
-  std::map<SolverType, std::map<std::string, int>> solver_options_int_;
-  std::map<SolverType, std::map<std::string, std::string>> solver_options_str_;
+  std::map<SolverId, std::map<std::string, double>> solver_options_double_;
+  std::map<SolverId, std::map<std::string, int>> solver_options_int_;
+  std::map<SolverId, std::map<std::string, std::string>> solver_options_str_;
 
   AttributesSet required_capabilities_{0};
 
