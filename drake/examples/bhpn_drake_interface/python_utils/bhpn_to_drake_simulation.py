@@ -15,6 +15,8 @@ import atexit
 import math
 import pydrake
 import numpy as np
+import subprocess
+import signal
 
 interface_path = 'drake/examples/bhpn_drake_interface/'
 interface_build_path = 'drake/bazel-bin/drake/examples/bhpn_drake_interface/'
@@ -129,6 +131,7 @@ class BhpnDrakeInterface:
 
         except KeyError:
             print "It appears that this robot is not supported in the bhpn to drake interface."
+        self.lastCommandedDrakeRobotConf = None
         self.replacementShapes = replacementShapes
         self.drakePoseIndices = {}
         self.grippedObjects = {}
@@ -192,8 +195,8 @@ class BhpnDrakeInterface:
         self.perfectHoldSenderPoisonPill = True
         self.perfectHoldSender.join()
         self.drakeSimulation.terminate()
-        returncode = self.drakeSimulation.wait()
-        print "Returncode of simulation: ", returncode
+        returnCode = self.drakeSimulation.wait()
+        print 'return code of drake simulation: ', returnCode
         print 'Terminated the bhpn-drake interface.'
 
     def createDrakeObjectFiles(self):
@@ -255,6 +258,18 @@ class BhpnDrakeInterface:
     def commandDrakeRobotConf(self, bhpnConf, waitTime=10):
         print "COMMAND BHPN: ", bhpnConf
         msg = self.robotConnection.toDrakeRobotConf(bhpnConf)
+        '''
+        if self.drakeRobotConf is not None:
+            for index in range(len(msg.joint_position)):
+                jd = msg.joint_position[index] + math.pi
+                ja = self.drakeRobotConf.joint_position[index] + math.pi
+                if abs(jd - ja) > math.pi:
+                    print "WOAH. I'm not letting that happen"
+                    if jd > ja:
+                        msg.joint_position[index] = ja - min([abs(2*math.pi - ja), abs(ja)]) + min([abs(2*math.pi - jd), abs(jd)]) - math.pi
+                    else:
+                        msg.joint_position[index] = ja + min([abs(2*math.pi - ja), abs(ja)]) + min([abs(2*math.pi - jd), abs(jd)]) - math.pi
+        '''
         print 'Attempting to move drake robot to bhpn commanded configuration.'
         self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
         startTime = time.time()
@@ -265,6 +280,7 @@ class BhpnDrakeInterface:
             print np.abs(np.array(msg.joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()
             time.sleep(0.1)
             self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
+        self.lastCommandedDrakeRobotConf = msg
         print 'Moved drake robot to bhpn commanded configuration.'
 
     ######### Getter methods ##################################################

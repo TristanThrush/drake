@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<robot name="tableIkea2">
-	<link name="tableIkea2">
+<robot name="sodaA">
+	<link name="sodaA">
 		<inertial>
 			<origin rpy="0 0 0" xyz="0 0 0" />
 			<mass value="6.0" />
@@ -9,13 +9,13 @@
     		<visual>
 	      		<origin rpy="0 0 0" xyz="0 0 0"/>
       			<geometry>
-        			<mesh filename="tableIkea2.obj"/>
+        			<mesh filename="sodaA.obj"/>
       			</geometry>
          	</visual>
     		<collision>
       			<origin rpy="0 0 0" xyz="0 0 0"/>
       			<geometry>
-        			<mesh filename="tableIkea2.obj"/>
+        			<mesh filename="sodaA.obj"/>
       			</geometry>
     		</collision>
 	</link>

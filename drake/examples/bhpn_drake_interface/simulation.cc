@@ -1,39 +1,17 @@
-#include <thread>
-#include <lcm/lcm-cpp.hpp>
-#include <unistd.h>
-
+#include "robotlocomotion/robot_plan_t.hpp"
 #include "drake/common/find_resource.h"
-#include "drake/common/trajectories/piecewise_polynomial.h"
-#include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
-#include "drake/examples/bhpn_drake_interface/lcm_utils/piecewise_polynomial_lcm.h"
 #include "drake/examples/bhpn_drake_interface/lcm_utils/robot_state_lcm.h"
 #include "drake/examples/bhpn_drake_interface/simulation_utils/sim_diagram_builder.h"
 #include "drake/examples/bhpn_drake_interface/simulation_utils/world_sim_tree_builder.h"
+#include "drake/examples/bhpn_drake_interface/controllers/pr2_fixed_controller.h"
 #include "drake/lcm/drake_lcm.h"
-#include "drake/lcmt_piecewise_polynomial.hpp"
 #include "drake/lcmt_robot_state.hpp"
-#include "drake/math/autodiff.h"
-#include "drake/math/roll_pitch_yaw.h"
-#include "drake/multibody/ik_options.h"
-#include "drake/multibody/joints/floating_base_types.h"
-#include "drake/multibody/kinematics_cache.h"
-#include "drake/multibody/parsers/urdf_parser.h"
-#include "drake/multibody/rigid_body_ik.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/systems/analysis/simulator.h"
-#include "drake/systems/controllers/inverse_dynamics_controller.h"
-#include "drake/systems/controllers/pid_controller.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
-#include "drake/systems/primitives/constant_vector_source.h"
-#include "drake/systems/primitives/demultiplexer.h"
-#include "drake/systems/primitives/multiplexer.h"
-#include "drake/systems/primitives/trajectory_source.h"
-#include "drake/util/lcmUtil.h"
-
 #include "drake/lcmt_contact_results_for_viz.hpp"
 #include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
-#include "drake/systems/lcm/lcm_publisher_system.h"
 
 using Eigen::Vector2d;
 using Eigen::Vector3d;
@@ -41,126 +19,9 @@ using Eigen::VectorXd;
 using Eigen::VectorXi;
 using Eigen::MatrixXd;
 
-std::vector<double> perfect_controller_desired_positions;
-std::vector<double> perfect_holder_desired_positions;
-volatile bool perfect_control_poison_pill = false;
-
-class Handler {
- public:
-  ~Handler() {}
-
-  void handleMessage(const lcm::ReceiveBuffer* rbuf, const std::string& chan,
-                     const drake::lcmt_robot_state* msg) {
-    for (int index = 0; index < (int)msg->joint_position.size(); index++) {
-      perfect_controller_desired_positions[index] =
-          msg->joint_position[index];
-    }
-  }
-};
-
-class HandlerPerfectHold {
- public:
-  ~HandlerPerfectHold() {}
-
-  void handleMessage(const lcm::ReceiveBuffer* rbuf, const std::string& chan,
-                     const drake::lcmt_robot_state* msg) {
-    int index2 = 2;
-    std::cout << msg->joint_position[0] << " " << msg->joint_position[1] << "\n";
-    for (int index = msg->joint_position[0]; index < (int)msg->joint_position[1]; index++) {
-      perfect_controller_desired_positions[index] =
-          msg->joint_position[index2];
-	index2 ++;
-    }
-  }
-};
-
-
-int perfect_controller_command_reciever() {
-  lcm::LCM lcm;
-  if (!lcm.good()) {
-    return 1;
-  }
-  Handler handlerObject;
-  lcm.subscribe("BHPN_ROBOT_STATE_COMMAND", &Handler::handleMessage,
-                &handlerObject);
-   while (0 == lcm.handle());
-
-  return 0;
-}
-
-int perfect_holder_command_reciever() {
-  lcm::LCM lcm;
-  if (!lcm.good()) {
-    return 1;
-  }
-  HandlerPerfectHold handlerPerfectHoldObject;
-  lcm.subscribe("PERFECT_HOLD_STATE", &HandlerPerfectHold::handleMessage, &handlerPerfectHoldObject);
-
-  while (0 == lcm.handle());
-
-  return 0;
-}
-
-
 namespace drake {
 namespace examples {
 namespace bhpn_drake_interface {
-
-std::unique_ptr<systems::PidController<double>> valkyrie_controller(
-    systems::RigidBodyPlant<double>* plant) {
-  int num_actuators = 30;
-  VectorX<double> kp(num_actuators);
-  kp << 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1, 1;
-  kp *= 1000;
-  VectorX<double> ki(num_actuators);
-  ki << 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0, 0;
-  VectorX<double> kd(num_actuators);
-  kd << 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-      1, 1, 1, 1, 1, 1;
-  kd *= 5;
-  auto Binv = plant->get_rigid_body_tree()
-                  .B.block(0, 0, num_actuators, num_actuators)
-                  .inverse();
-  return std::make_unique<systems::PidController<double>>(
-      Binv, MatrixX<double>::Identity(2 * kp.size(), 2 * kp.size()), kp, ki,
-      kd);
-}
-
-std::unique_ptr<systems::PidController<double>> pr2_controller(
-    systems::RigidBodyPlant<double>* plant) {
-  int num_actuators = 21;
-  VectorX<double> kp(num_actuators);
-  kp << 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 80, 80, 80, 80, 4000, 4100, 2000,
-      2000, 300, 80, 80, 80, 80;
-  kp *= 0.5;
-  VectorX<double> ki(num_actuators);
-  ki << 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15;
-  ki *= 0.3;
-  VectorX<double> kd(num_actuators);
-  kd << 7, 7, 7, 7, 7, 7, 7, 2, 2, 1, 0, 0, 7, 7, 7, 7, 2, 2, 1, 0, 0;
-  kd *= 0.1;
-  auto Binv = plant->get_rigid_body_tree()
-                  .B.block(0, 0, num_actuators, num_actuators)
-                  .inverse();
-  return std::make_unique<systems::PidController<double>>(
-      Binv, MatrixX<double>::Identity(2 * kp.size(), 2 * kp.size()), kp, ki,
-      kd);
-}
-
-std::unique_ptr<systems::InverseDynamicsController<double>> iiwa_controller(
-    std::unique_ptr<RigidBodyTree<double>> tree_) {
-  int num_actuators = 7;
-  VectorX<double> kp(num_actuators);
-  kp << 100, 100, 100, 100, 100, 100, 100;
-  VectorX<double> ki(num_actuators);
-  ki << 0, 0, 0, 0, 0, 0, 0;
-  VectorX<double> kd(num_actuators);
-  kd << 2, 2, 2, 2, 2, 2, 2;
-  return std::make_unique<systems::InverseDynamicsController<double>>(
-      std::move(tree_), kp, ki, kd, false);
-}
 
 std::unique_ptr<RigidBodyTree<double>> build_world_tree(
     std::vector<ModelInstanceInfo<double>>* world_info,
@@ -189,32 +50,19 @@ std::unique_ptr<RigidBodyTree<double>> build_world_tree(
   return tree_builder->Build();
 }
 
-void perfect_controller(systems::Context<double>* context,
-                        systems::RigidBodyPlant<double>* plant) {
-  while (!perfect_control_poison_pill) {
-    for (int index = 0;
-         index < plant->get_rigid_body_tree().get_num_actuators(); index++) {
-	if(index != 19 and index != 20 and index != 10 and index != 11){//TODO: make this more general. these indexes are only suitable for the pr2	
-      plant->set_position(context, index,
-                          perfect_controller_desired_positions[index]);
-     }
-}
-  }
-}
-
 void main(int argc, char* argv[]) {
   // parse the arguments
   std::vector<std::string> urdf_paths;
   std::vector<Vector3d> poses_xyz;
   std::vector<Vector3d> poses_rpy;
   std::vector<std::string> fixed;
-  std::vector<double> initial_joint_positions;
   std::string perfect_control = std::string(argv[1]);
   int num_actuators = std::stoi(argv[2]);
+  Eigen::VectorXd initial_joint_positions(num_actuators);
   std::string robot_name(argv[num_actuators + 3]);
 
   for (int index = 3; index < num_actuators + 3; index++) {
-    initial_joint_positions.push_back(std::stod(argv[index]));
+    initial_joint_positions[index - 3] = std::stod(argv[index]);
   }
 
   for (int index = num_actuators + 4; index < argc; index++) {
@@ -254,85 +102,26 @@ void main(int argc, char* argv[]) {
   builder.AddVisualizer(&lcm);
 
   // set up communication with BHPN
-  auto command_sub = diagram_builder->AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_robot_state>(
-          "BHPN_ROBOT_STATE_COMMAND", &lcm));
-  command_sub->set_name("command_subscriber");
-  auto command_receiver =
-      diagram_builder->AddSystem<RobotStateReceiver>(num_actuators);
-  command_receiver->set_name("command_receiver");
-
   auto status_pub = diagram_builder->AddSystem(
       systems::lcm::LcmPublisherSystem::Make<lcmt_robot_state>(
-          "DRAKE_ROBOT_STATE", &lcm));
+          "ROBOT_STATE", &lcm));
 
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(lcmStatusPeriod);
   auto status_sender =
       diagram_builder->AddSystem<RobotStateSender>(num_actuators);
   status_sender->set_name("status_sender");
-
-  diagram_builder->Connect(command_sub->get_output_port(0),
-                           command_receiver->get_input_port(0));
-
-  // connect the appropriate controller for the type of robot
-  const auto& state_out_port =
-      plant->model_instance_state_output_port(world_info[0].instance_id);
-  auto demux = diagram_builder->template AddSystem<systems::Demultiplexer>(
-      state_out_port.size());
-  auto mux = diagram_builder->template AddSystem<systems::Multiplexer>(
-      num_actuators * 2);
-  diagram_builder->Connect(state_out_port, demux->get_input_port(0));
-
-  for (int index = 0; index < num_actuators * 2; index++) {
-    diagram_builder->Connect(demux->get_output_port(index),
-                             mux->get_input_port(index));
-  }
-
-  if (!robot_name.compare("pr2")) {
-    auto controller =
-        diagram_builder->AddSystem<systems::PidController<double>>(
-            pr2_controller(plant));
-    diagram_builder->Connect(command_receiver->get_output_port(0),
-                             controller->get_input_port_desired_state());
-    diagram_builder->Connect(mux->get_output_port(0),
-                             controller->get_input_port_estimated_state());
-    diagram_builder->Connect(controller->get_output_port_control(),
-                             plant->model_instance_actuator_command_input_port(
-                                 world_info[0].instance_id));
-  } else if (!robot_name.compare("iiwa")) {
-    auto single_arm = std::make_unique<RigidBodyTree<double>>();
-    parsers::urdf::AddModelInstanceFromUrdfFile(
-        world_info[0].model_path, multibody::joints::kFixed,
-        world_info[0].world_offset, single_arm.get());
-    auto controller =
-        diagram_builder->AddSystem<systems::InverseDynamicsController<double>>(
-            iiwa_controller(std::move(single_arm)));
-    diagram_builder->Connect(command_receiver->get_output_port(0),
-                             controller->get_input_port_desired_state());
-    diagram_builder->Connect(mux->get_output_port(0),
-                             controller->get_input_port_estimated_state());
-    diagram_builder->Connect(controller->get_output_port_control(),
-                             plant->model_instance_actuator_command_input_port(
-                                 world_info[0].instance_id));
-  } else if (!robot_name.compare("valkyrie")) {
-    auto controller =
-        diagram_builder->AddSystem<systems::PidController<double>>(
-            valkyrie_controller(plant));
-    diagram_builder->Connect(command_receiver->get_output_port(0),
-                             controller->get_input_port_desired_state());
-    diagram_builder->Connect(mux->get_output_port(0),
-                             controller->get_input_port_estimated_state());
-    diagram_builder->Connect(controller->get_output_port_control(),
-                             plant->model_instance_actuator_command_input_port(
-                                 world_info[0].instance_id));
-  }
-
-  diagram_builder->Connect(
-      mux->get_output_port(
-          0),  // plant->model_instance_state_output_port(world_info[0].instance_id),
-      status_sender->get_state_input_port());
-  diagram_builder->Connect(command_receiver->get_output_port(0),
+ 
+auto plan_receiver = diagram_builder->AddSystem(
+      systems::lcm::LcmSubscriberSystem::Make<robotlocomotion::robot_plan_t>(
+          "ROBOT_PLAN", &lcm));
+  plan_receiver->set_name("plan_receiver");
+  
+  auto command_injector = diagram_builder->AddSystem<RobotPlanInterpolator>(FindResourceOrThrow(pr2FixedUrdf));
+  command_injector->set_name("command_injector");
+  add_pr2_fixed_controller(diagram_builder, plant, world_info[0].instance_id, plan_receiver, command_injector);
+  diagram_builder->Connect(plant->model_instance_state_output_port(world_info[0].instance_id), status_sender->get_state_input_port());
+  diagram_builder->Connect(command_injector->get_state_output_port(),
                            status_sender->get_command_input_port());
   diagram_builder->Connect(status_sender->get_output_port(0),
                            status_pub->get_input_port(0));
@@ -350,35 +139,33 @@ void main(int argc, char* argv[]) {
   diagram_builder->Connect(contact_viz->get_output_port(0),
                            contact_results_publisher->get_input_port(0));
 
-  //give the plant some contact parameters
+  //give the plant some contact parameters that encourage the gripping of objects
   const double kStiffness = 5000;
   const double kDissipation = 2.0;
   const double kStaticFriction = 4.7;
-  const double kDynamicFriction = 3.7; //1.5
+  const double kDynamicFriction = 3.7; 
   const double kVStictionTolerance = 0.5;
   plant->set_normal_contact_parameters(kStiffness, kDissipation);
   plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                          kVStictionTolerance);
 
-  // start the simulation
+  //Initialize the starting configuration of the joints, initialize the command_injector, and start the simulation.
   lcm.StartReceiveThread();
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
   systems::Simulator<double> simulator(*diagram);
-  auto context = simulator.get_mutable_context();
   for (int index = 0;
          index < plant->get_rigid_body_tree().get_num_actuators(); index++) {
-      plant->set_position(context, index,
+      plant->set_position(simulator.get_mutable_context(), index,
                           initial_joint_positions[index]);
   }
-  perfect_control_poison_pill = perfect_control.compare("true");
-  perfect_controller_desired_positions = initial_joint_positions;
-  std::thread c(perfect_controller, context, plant);
-  std::thread r(perfect_controller_command_reciever);
-  //std::thread h(perfect_holder_command_reciever);
-  std::cout<<"positions: " << plant->get_num_positions()<<"\n";
-
   simulator.Initialize();
-  simulator.set_target_realtime_rate(1.0);
+  simulator.set_target_realtime_rate(10.0);
+  auto& plan_source_context = diagram->GetMutableSubsystemContext(
+      *command_injector, simulator.get_mutable_context());
+  command_injector->Initialize(
+      plan_source_context.get_time(),
+      initial_joint_positions,
+      plan_source_context.get_mutable_state());
   simulator.StepTo(5000000000);
 }
 }  // namespace bhpn_drake_interface
