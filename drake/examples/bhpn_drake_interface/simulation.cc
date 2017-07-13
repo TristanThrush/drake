@@ -13,20 +13,14 @@
 #include "drake/lcmt_contact_results_for_viz.hpp"
 #include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
 
-using Eigen::Vector2d;
-using Eigen::Vector3d;
-using Eigen::VectorXd;
-using Eigen::VectorXi;
-using Eigen::MatrixXd;
-
 namespace drake {
 namespace examples {
 namespace bhpn_drake_interface {
 
 std::unique_ptr<RigidBodyTree<double>> build_world_tree(
     std::vector<ModelInstanceInfo<double>>* world_info,
-    std::vector<std::string> urdf_paths, std::vector<Vector3d> poses_xyz,
-    std::vector<Vector3d> poses_rpy, std::vector<std::string> fixed) {
+    std::vector<std::string> urdf_paths, std::vector<Eigen::Vector3d> poses_xyz,
+    std::vector<Eigen::Vector3d> poses_rpy, std::vector<std::string> fixed) {
   auto tree_builder = std::make_unique<WorldSimTreeBuilder<double>>();
   for (auto urdf : urdf_paths) {
     tree_builder->StoreModel(urdf, urdf);
@@ -53,8 +47,8 @@ std::unique_ptr<RigidBodyTree<double>> build_world_tree(
 void main(int argc, char* argv[]) {
   // parse the arguments
   std::vector<std::string> urdf_paths;
-  std::vector<Vector3d> poses_xyz;
-  std::vector<Vector3d> poses_rpy;
+  std::vector<Eigen::Vector3d> poses_xyz;
+  std::vector<Eigen::Vector3d> poses_rpy;
   std::vector<std::string> fixed;
   std::string perfect_control = std::string(argv[1]);
   int num_actuators = std::stoi(argv[2]);
@@ -73,14 +67,14 @@ void main(int argc, char* argv[]) {
     double y = std::stod(argv[index]);
     index++;
     double z = std::stod(argv[index]);
-    poses_xyz.push_back(Vector3d(x, y, z));
+    poses_xyz.push_back(Eigen::Vector3d(x, y, z));
     index++;
     double roll = std::stod(argv[index]);
     index++;
     double pitch = std::stod(argv[index]);
     index++;
     double yaw = std::stod(argv[index]);
-    poses_rpy.push_back(Vector3d(roll, pitch, yaw));
+    poses_rpy.push_back(Eigen::Vector3d(roll, pitch, yaw));
     index++;
     fixed.push_back(argv[index]);
   }

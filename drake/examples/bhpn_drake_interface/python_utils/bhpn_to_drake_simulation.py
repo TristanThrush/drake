@@ -5,9 +5,9 @@ import threading
 from geometry import shapes, hu
 from robot import conf
 import lcm
-from lcmt_robot_state import lcmt_robot_state
-from lcmt_viewer_draw import lcmt_viewer_draw
-from lcmt_contact_results_for_viz import lcmt_contact_results_for_viz
+from drake import lcmt_robot_state, lcmt_viewer_draw, lcmt_contact_results_for_viz
+from bot_core import robot_state_t
+from robotlocomotion import robot_plan_t
 from operator import sub
 import time
 import bhpn_to_drake_object
@@ -67,17 +67,24 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
         msg = lcmt_robot_state()
         msg.timestamp = time.time() * 1000000
         msg.num_joints = self.numJoints
-        msg.joint_position = bhpnRobotConf['pr2Torso']\
+        msg.joint_position = self.toJointList(bhpnRobotConf)
+        msg.joint_robot = [0] * msg.num_joints
+        msg.joint_name = [''] * msg.num_joints
+        msg.joint_velocity = [0.0] * msg.num_joints
+        print 'msg: ', msg
+        return msg
+ 
+    def toJointList(self, bhpnRobotConf):
+        return  bhpnRobotConf['pr2Torso']\
             + bhpnRobotConf['pr2Head']\
             + bhpnRobotConf['pr2RightArm']\
             + [min([0.5, 100*bhpnRobotConf['pr2RightGripper'][0]**2])] * 2\
             + bhpnRobotConf['pr2LeftArm']\
             + [min([0.5, 100*bhpnRobotConf['pr2LeftGripper'][0]**2])] * 2
-        msg.joint_robot = [0] * msg.num_joints
-        msg.joint_name = [''] * msg.num_joints
-        msg.joint_velocity = [0.0] * msg.num_joints
-        return msg
 
+    def getJointListNames(self):
+        return ['torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
+    
     def getUrdfPath(self):
         return self.urdfPath
 
@@ -157,7 +164,7 @@ class BhpnDrakeInterface:
                         self.robotConnection.getUrdfPath()] = self.robotName
 
         self.lc = lcm.LCM()
-        self.lc.subscribe('DRAKE_ROBOT_STATE', self.robotConfCallback)
+        self.lc.subscribe('ROBOT_STATE', self.robotConfCallback)
         self.lc.subscribe('DRAKE_VIEWER_DRAW', self.objectPoseCallback)
         self.lc.subscribe('CONTACT_RESULTS', self.contactResultsCallback)
 
@@ -175,7 +182,7 @@ class BhpnDrakeInterface:
             self.createDrakeSimulationCommand(),
             shell=True)
         
-        while self.robotConfUpdatedByDrake is False and self.contactResults is None:
+        while self.robotConfUpdatedByDrake is False or self.contactResults is None:
             time.sleep(0.1)
 
         self.perfectHoldSenderPoisonPill = False
@@ -254,6 +261,39 @@ class BhpnDrakeInterface:
         return command
 
     ######### Simulation command methods ######################################
+
+    def encodeDrakeRobotPlanFromBhpnPath(self, bhpnPath, time):
+        assert len(time) == len(bhpnPath)
+        plan = robot_plan_t()
+        plan.utime = 0
+        plan.robot_name = self.robotName 
+        plan.num_states = len(time)
+        plan.plan_info = [1]*plan.num_states #TODO: figure out what this is
+        for index in range(len(bhpnPath)):
+            state = robot_state_t()
+            state.utime = time[index]
+            state.num_joints = self.robotConnection.getNumJoints()
+            state.joint_name = self.robotConnection.getJointListNames()
+            state.joint_position = self.robotConnection.toJointList(bhpnPath[index])
+            state.joint_velocity = [0]*state.num_joints
+            state.joint_effort = [0]*state.num_joints
+            plan.plan.append(state)
+        plan.num_grasp_transitions = 0
+        plan.left_arm_control_type = plan.POSITION
+        plan.right_arm_control_type = plan.POSITION
+        plan.left_leg_control_type = plan.POSITION
+        plan.right_leg_control_type = plan.POSITION
+        plan.num_bytes = 0
+        return plan
+
+    def commandDrakeRobotPlan(self, plan):
+        print "Attempting to follow plan"
+        self.lc.publish('ROBOT_PLAN', plan.encode())
+        #TODO: think about the best way to consider this plan finished
+        while np.max(np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()) > 0:
+            #print np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()
+            time.sleep(0.1)
+        print "Done following plan"
 
     def commandDrakeRobotConf(self, bhpnConf, waitTime=10):
         print "COMMAND BHPN: ", bhpnConf
