@@ -14,19 +14,19 @@
 	</material>
 	<link name="object_name">
 		<inertial>
-			<origin rpy="R P Y" xyz="X Y Z" />
+			<!--origin rpy="R P Y" xyz="X Y Z" /-->
 			<mass value="M" />
 			<!--inertia ixx="0.000360" ixy="0" ixz="0" iyy="0.0000615" iyz="0" izz="0.00036" /-->
 		</inertial>
     		<visual>
-	      		<origin rpy="R P Y" xyz="X Y Z"/>
+	      		<origin rpy="R P YA" xyz="X Y Z"/>
       			<geometry>
         			<mesh filename="object_name.obj"/>
       			</geometry>
 			<material name="COLOR" />
          	</visual>
     		<collision>
-      			<origin rpy="R P Y" xyz="X Y Z"/>
+      			<origin rpy="R P YA" xyz="X Y Z"/>
       			<geometry>
         			<mesh filename="object_name.obj"/>
       			</geometry>

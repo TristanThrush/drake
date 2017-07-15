@@ -25,7 +25,7 @@ def convert(args, transform, mass='25', color='white'):
         text = text.replace('M', str(mass))
         text = text.replace('R', str(transform[0]))
         text = text.replace('P', str(transform[1]))
-        text = text.replace('Y', str(transform[2]))
+        text = text.replace('YA', str(transform[2]))
         text = text.replace('X', str(transform[3]))
         text = text.replace('Y', str(transform[4]))
         text = text.replace('Z', str(transform[5]))

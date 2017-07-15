@@ -48,7 +48,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         self.robotName = 'pr2'
         self.numJoints = 24
         self.urdfPath = 'drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf'
-        self.moveThreshold = np.array([.0075, .0075, .0015, .015, .015, .015, .015, .015, .015, .015, .015, .010, .010, .050, .050, .015, .015, .015, .015, .015, .010, .010, .050, .050])
+        self.moveThreshold = np.array([.0075, .0075, .0015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .050, .050, .015, .015, .015, .015, .015, .015, .015, .050, .050])
         self.moveThreshold *= 4
 
     def toBhpnRobotConf(self, drakeRobotConf):
@@ -131,7 +131,7 @@ class BhpnDrakeInterface:
             robotFixed,
             bhpnObjectConfs,
             fixedObjects,
-            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57079,0,0,-0.05,0,-0.08], 2.0, 'purple')}
+            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57,3.14159,3.14159,-0.05,0.03,0.04], 2.0, 'purple')}
             ):
         self.robotName = robotName.lower()
         supportedRobots = {'pr2': Pr2JointsForBaseMovementBhpnDrakeConnection}
@@ -142,6 +142,7 @@ class BhpnDrakeInterface:
 
         except KeyError:
             print "It appears that this robot is not supported in the bhpn to drake interface."
+        print 'confs: ', bhpnObjectConfs
         self.lastCommandedDrakeRobotConf = None
         self.replacementShapes = replacementShapes
         self.drakePoseIndices = {}
@@ -282,7 +283,7 @@ class BhpnDrakeInterface:
             for continuousJointIndex in self.robotConnection.getContinuousJointListIndices():
                 if state.joint_position[continuousJointIndex] - lastJointValuesOnPath[continuousJointIndex] > math.pi:
                     state.joint_position[continuousJointIndex] -= 2*math.pi
-                elif state.joint_position[continuousJointIndex] - lastJointValuesOnPath[continuousJointIndex] < -1*math.pi:
+                if state.joint_position[continuousJointIndex] - lastJointValuesOnPath[continuousJointIndex] < -1*math.pi:
                     state.joint_position[continuousJointIndex] += 2*math.pi
             lastJointValuesOnPath = state.joint_position
             plan.plan.append(state)
@@ -332,15 +333,8 @@ class BhpnDrakeInterface:
     def objectPoseCallback(self, channel, data):
         msg = lcmt_viewer_draw.decode(data)
         for obj in self.bhpnObjectConfs:
-                if obj == 'objA':
-                    pose = self.convertToBhpnPose(
-                    msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
-                    
-                    pose.theta += 1.57
-                    self.bhpnObjectConfs[obj] = pose
-                else:
-                    self.bhpnObjectConfs[obj] = self.convertToBhpnPose(
-                    msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
+            self.bhpnObjectConfs[obj] = self.convertToBhpnPose(
+            msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
 
         #print self.bhpnObjectConfs
         for obj in msg.link_name:
@@ -362,33 +356,31 @@ class BhpnDrakeInterface:
             position[0],
             position[1],
             position[2],
-            2 *
-            math.acos(
-                orientation[0]))
-
+            self.convertFromQuaternionToRPY(orientation)[2])
+            
     def convertToDrakePose(self, pose):
         return [pose.x, pose.y, pose.z, 0, 0, pose.theta]
 
     def convertFromQuaternionToRPY(self, quaternion):
-        x = quaternion[0]
-        y = quaternion[1]
-        z = quaternion[2]
-        w = quaternion[3]
+        w = quaternion[0]
+        x = quaternion[1]
+        y = quaternion[2]
+        z = quaternion[3]
 
         ysqr = y * y
 
         t0 = +2.0 * (w * x + y * z)
         t1 = +1.0 - 2.0 * (x * x + ysqr)
-        r = math.degrees(math.atan2(t0, t1))
+        r = math.atan2(t0, t1)
 
         t2 = +2.0 * (w * y - z * x)
         t2 = 1 if t2 > 1 else t2
         t2 = -1 if t2 < -1 else t2
-        p = math.degrees(math.asin(t2))
+        p = math.asin(t2)
 
         t3 = +2.0 * (w * z + x * y)
         t4 = +1.0 - 2.0 * (ysqr + z * z)
-        y = math.degrees(math.atan2(t3, t4))
+        y = math.atan2(t3, t4)
         return [r, p, y]
 
     def linkToLinkDrakeTransform(self, link1_name, link2_name):
