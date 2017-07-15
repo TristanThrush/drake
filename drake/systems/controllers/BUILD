@@ -62,6 +62,7 @@ drake_cc_library(
         ":state_feedback_controller_interface",
         "//drake/systems/framework:leaf_system",
         "//drake/systems/primitives:matrix_gain",
+	"//drake/common:extract_double",
     ],
 )
 

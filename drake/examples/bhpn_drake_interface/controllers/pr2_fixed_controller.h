@@ -13,12 +13,11 @@
 #include "drake/lcmt_contact_results_for_viz.hpp"
 #include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
 #include "drake/systems/controllers/pid_controller.h"
+#include "drake/systems/primitives/matrix_gain.h"
 
 namespace drake {
 namespace examples {
 namespace bhpn_drake_interface {
-
-const char pr2FixedUrdf[] = "drake/examples/PR2/pr2_fixed.urdf";
 
 systems::PidController<double>* add_pr2_fixed_controller(systems::DiagramBuilder<double>* diagram_builder, systems::RigidBodyPlant<double>* plant, int pr2_fixed_instance_id,  systems::lcm::LcmSubscriberSystem* plan_receiver, RobotPlanInterpolator* command_injector);  
 

@@ -1,18 +1,6 @@
 <?xml version="1.0"?>
-<robot name="tableIkea2">
-	<material name="white">
-		<color rgba="1 1 1 1" />
-	</material>
-	<material name="orange">
-		<color rgba="1 0.66 0 1" />
-	</material>
-	<material name="purple">
-		<color rgba="0.66 0 0.66 1" />
-	</material>
-	<material name="grey">
-		<color rgba="0.5 0.5 0.5 1" />
-	</material>
-	<link name="tableIkea2">
+<robot name="lowTable">
+	<link name="lowTable">
 		<inertial>
 			<origin rpy="0 0 0" xyz="0 0 0" />
 			<mass value="6.0" />
@@ -21,14 +9,13 @@
     		<visual>
 	      		<origin rpy="0 0 0" xyz="0 0 0"/>
       			<geometry>
-        			<mesh filename="tableIkea2.obj"/>
+        			<mesh filename="lowTable.obj"/>
       			</geometry>
-			<material name="grey" />
          	</visual>
     		<collision>
       			<origin rpy="0 0 0" xyz="0 0 0"/>
       			<geometry>
-        			<mesh filename="tableIkea2.obj"/>
+        			<mesh filename="lowTable.obj"/>
       			</geometry>
     		</collision>
 	</link>

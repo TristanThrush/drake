@@ -83,6 +83,40 @@
        (e.g., base_link).  The included origin block is also an argument to the macro.  By convention, 
        the origin block defines where the component is w.r.t its parent (in this case the parent 
        is the world frame). For more, see http://www.ros.org/wiki/xacro -->
+  <link name="world_link"/>
+  <link name="base_link_0"/>
+  <link name="base_link_1"/>
+  <joint name="x" type="prismatic">
+	<parent link="world_link"/>
+	<child link="base_link_0"/>
+	<axis xyz="1 0 0"/>
+  </joint>
+  <joint name="y" type="prismatic">
+	<parent link="base_link_0"/>
+	<child link="base_link_1"/>
+	<axis xyz="0 1 0"/>
+  </joint>
+  <joint name="theta" type="continuous">
+	<parent link="base_link_1"/>
+	<child link="base_footprint"/>
+	<axis xyz="0 0 1"/>
+  </joint>
+  <transmission name="x_transmission" type="SimpleTransmission">
+	<actuator name="x_motor"/>
+	<joint name="x"/>
+	<mechanicalReduction>-70000.0</mechanicalReduction>
+  </transmission>
+  <transmission name="y_transmission" type="SimpleTransmission">
+	<actuator name="y_motor"/>
+	<joint name="y"/>
+	<mechanicalReduction>-70000.0</mechanicalReduction>
+  </transmission>
+  <transmission name="theta_transmission" type="SimpleTransmission">
+	<actuator name="theta_motor"/>
+	<joint name="theta"/>
+	<mechanicalReduction>-70000.0</mechanicalReduction>
+  </transmission>
+  
   <link name="base_link">
     <inertial>
       <mass value="116.0"/>

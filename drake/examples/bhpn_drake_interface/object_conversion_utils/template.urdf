@@ -1,5 +1,17 @@
 <?xml version="1.0"?>
 <robot name="object_name">
+	<material name="white">
+		<color rgba="1 1 1 1" />
+	</material>
+	<material name="orange">
+		<color rgba="1 0.66 0 1" />
+	</material>
+	<material name="purple">
+		<color rgba="0.66 0 0.66 1" />
+	</material>
+	<material name="grey">
+		<color rgba="0.5 0.5 0.5 1" />
+	</material>
 	<link name="object_name">
 		<inertial>
 			<origin rpy="R P Y" xyz="X Y Z" />
@@ -11,6 +23,7 @@
       			<geometry>
         			<mesh filename="object_name.obj"/>
       			</geometry>
+			<material name="COLOR" />
          	</visual>
     		<collision>
       			<origin rpy="R P Y" xyz="X Y Z"/>

@@ -41,24 +41,25 @@ class RobotBhpnDrakeConnection:
         raise NotImplementedError
 
 
-class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
+class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
 
     def __init__(self, bhpnRobotConf):
         RobotBhpnDrakeConnection.__init__(self, bhpnRobotConf)
         self.robotName = 'pr2'
-        self.numJoints = 21
-        self.urdfPath = 'drake/examples/PR2/pr2_fixed.urdf'
-        self.moveThreshold = np.array([.015, .015, .015, .015, .015, .015, .015, .015, .010, .010, .040, .040, .015, .015, .015, .015, .015, .010, .010, .040, .040])
+        self.numJoints = 24
+        self.urdfPath = 'drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf'
+        self.moveThreshold = np.array([.0075, .0075, .0015, .015, .015, .015, .015, .015, .015, .015, .015, .010, .010, .050, .050, .015, .015, .015, .015, .015, .010, .010, .050, .050])
         self.moveThreshold *= 4
 
     def toBhpnRobotConf(self, drakeRobotConf):
         drake_joints = drakeRobotConf.joint_position
-        mapping = {'pr2Torso': drake_joints[0:1],
-                   'pr2Head': drake_joints[1:3],
-                   'pr2RightArm': drake_joints[3:10],
-                   'pr2RightGripper': [np.sqrt(drake_joints[10:11][0]/100.0)],
-                   'pr2LeftArm': drake_joints[12:19],
-                   'pr2LeftGripper': [np.sqrt(drake_joints[19:20][0]/100.0)]}
+        mapping = {'pr2Base': drake_joints[0:3],
+                   'pr2Torso': drake_joints[3:4],
+                   'pr2Head': drake_joints[4:6],
+                   'pr2RightArm': drake_joints[6:13],
+                   'pr2RightGripper': [np.sqrt(drake_joints[13:14][0]/100.0)],
+                   'pr2LeftArm': drake_joints[15:22],
+                   'pr2LeftGripper': [np.sqrt(drake_joints[22:23][0]/100.0)]}
         for k, v in mapping.items():
             self.bhpnRobotConf = self.bhpnRobotConf.set(k, list(v))
         return self.bhpnRobotConf.copy()
@@ -75,7 +76,8 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
         return msg
  
     def toJointList(self, bhpnRobotConf):
-        return  bhpnRobotConf['pr2Torso']\
+        return bhpnRobotConf['pr2Base']\
+            + bhpnRobotConf['pr2Torso']\
             + bhpnRobotConf['pr2Head']\
             + bhpnRobotConf['pr2RightArm']\
             + [min([0.5, 100*bhpnRobotConf['pr2RightGripper'][0]**2])] * 2\
@@ -83,7 +85,7 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
             + [min([0.5, 100*bhpnRobotConf['pr2LeftGripper'][0]**2])] * 2
 
     def getJointListNames(self):
-        return ['torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
+        return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
     
     def getUrdfPath(self):
         return self.urdfPath
@@ -96,6 +98,9 @@ class Pr2BhpnDrakeConnection(RobotBhpnDrakeConnection):
 
     def handToEndEffector(self):
         return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
+
+    def getContinuousJointListIndices(self):
+        return [5, 7, 9, 14, 16, 18]
 
     def grippedObjects(self, contact_results, objectsToCheck):
         gripper_end_effector_to_gripped_objects = {'l_gripper_palm_link':[], 'r_gripper_palm_link':[]}
@@ -126,11 +131,10 @@ class BhpnDrakeInterface:
             robotFixed,
             bhpnObjectConfs,
             fixedObjects,
-            perfectControlAndObjectHolding = False,
-            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57079,0,0,-0.09,0,-0.08], 0.25)}
+            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57079,0,0,-0.05,0,-0.08], 2.0, 'purple')}
             ):
         self.robotName = robotName.lower()
-        supportedRobots = {'pr2': Pr2BhpnDrakeConnection}
+        supportedRobots = {'pr2': Pr2JointsForBaseMovementBhpnDrakeConnection}
 
         try:
             self.robotConnection = supportedRobots[self.robotName](
@@ -143,7 +147,6 @@ class BhpnDrakeInterface:
         self.drakePoseIndices = {}
         self.grippedObjects = {}
 
-        self.perfectControlAndObjectHolding = perfectControlAndObjectHolding
         self.world = world.copy()
         self.bhpnRobotConf = bhpnRobotConf.copy()
         self.initialBhpnRobotPose = self.bhpnRobotConf.basePose()
@@ -185,11 +188,6 @@ class BhpnDrakeInterface:
         while self.robotConfUpdatedByDrake is False or self.contactResults is None:
             time.sleep(0.1)
 
-        self.perfectHoldSenderPoisonPill = False
-        self.perfectHoldSender = threading.Thread(target=self.perfectHoldCommander)
-        self.perfectHoldSender.daemon = True
-        self.perfectHoldSender.start()
-
         atexit.register(self.release)
         print 'Initialized the bhpn-drake interface.'
 
@@ -199,8 +197,6 @@ class BhpnDrakeInterface:
         print 'Attempting to terminate the bhpn-drake interface.'
         self.handlerPoisonPill = True
         self.robotConfHandler.join()
-        self.perfectHoldSenderPoisonPill = True
-        self.perfectHoldSender.join()
         self.drakeSimulation.terminate()
         returnCode = self.drakeSimulation.wait()
         print 'return code of drake simulation: ', returnCode
@@ -213,10 +209,12 @@ class BhpnDrakeInterface:
                 shape = self.world.objectShapes[obj]
                 transform = [0,0,0,0,0,0]
                 mass = 6.0
+                color = 'grey'
             else:
                 shape = self.replacementShapes[obj][0]
                 transform = self.replacementShapes[obj][1]
-                mass = 2.0
+                mass = self.replacementShapes[obj][2]
+                color = self.replacementShapes[obj][3]
             path_to_objects = interface_path_absolute + 'object_conversion_utils/'
             shapes.writeOff(
                 shape,
@@ -225,13 +223,12 @@ class BhpnDrakeInterface:
                 obj +
                 '.off')
             bhpn_to_drake_object.convert(
-                path_to_objects + 'generated_bhpn_objects/' + obj + '.off', transform, mass)
+                path_to_objects + 'generated_bhpn_objects/' + obj + '.off', transform, mass, color)
             objectFiles[obj] = 'drake/examples/bhpn_drake_interface/object_conversion_utils/generated_drake_objects/' + obj + '.urdf '
         return objectFiles
 
     def createDrakeSimulationCommand(self):
         command = interface_build_path_absolute + 'simulation '
-        command += str(self.perfectControlAndObjectHolding).lower() + ' '
         command += str(self.robotConnection.getNumJoints()) + ' '
         for joint in self.robotConnection.toDrakeRobotConf(
                 self.bhpnRobotConf).joint_position:
@@ -264,11 +261,15 @@ class BhpnDrakeInterface:
 
     def encodeDrakeRobotPlanFromBhpnPath(self, bhpnPath, time):
         assert len(time) == len(bhpnPath)
+        print 'encoding path: '
+        for jointConf in bhpnPath:
+            jointConf.prettyPrint()
         plan = robot_plan_t()
         plan.utime = 0
         plan.robot_name = self.robotName 
         plan.num_states = len(time)
         plan.plan_info = [1]*plan.num_states #TODO: figure out what this is
+        lastJointValuesOnPath = self.drakeRobotConf.joint_position #
         for index in range(len(bhpnPath)):
             state = robot_state_t()
             state.utime = time[index]
@@ -277,6 +278,13 @@ class BhpnDrakeInterface:
             state.joint_position = self.robotConnection.toJointList(bhpnPath[index])
             state.joint_velocity = [0]*state.num_joints
             state.joint_effort = [0]*state.num_joints
+            #modify the plan so that drake wont stupidly take the long way from 0 to 2 pi for continuous joints
+            for continuousJointIndex in self.robotConnection.getContinuousJointListIndices():
+                if state.joint_position[continuousJointIndex] - lastJointValuesOnPath[continuousJointIndex] > math.pi:
+                    state.joint_position[continuousJointIndex] -= 2*math.pi
+                elif state.joint_position[continuousJointIndex] - lastJointValuesOnPath[continuousJointIndex] < -1*math.pi:
+                    state.joint_position[continuousJointIndex] += 2*math.pi
+            lastJointValuesOnPath = state.joint_position
             plan.plan.append(state)
         plan.num_grasp_transitions = 0
         plan.left_arm_control_type = plan.POSITION
@@ -290,38 +298,13 @@ class BhpnDrakeInterface:
         print "Attempting to follow plan"
         self.lc.publish('ROBOT_PLAN', plan.encode())
         #TODO: think about the best way to consider this plan finished
+        
         while np.max(np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()) > 0:
-            #print np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()
+            print np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()
             time.sleep(0.1)
+        
+        #time.sleep(plan.plan[-1].utime/20000.0)
         print "Done following plan"
-
-    def commandDrakeRobotConf(self, bhpnConf, waitTime=10):
-        print "COMMAND BHPN: ", bhpnConf
-        msg = self.robotConnection.toDrakeRobotConf(bhpnConf)
-        '''
-        if self.drakeRobotConf is not None:
-            for index in range(len(msg.joint_position)):
-                jd = msg.joint_position[index] + math.pi
-                ja = self.drakeRobotConf.joint_position[index] + math.pi
-                if abs(jd - ja) > math.pi:
-                    print "WOAH. I'm not letting that happen"
-                    if jd > ja:
-                        msg.joint_position[index] = ja - min([abs(2*math.pi - ja), abs(ja)]) + min([abs(2*math.pi - jd), abs(jd)]) - math.pi
-                    else:
-                        msg.joint_position[index] = ja + min([abs(2*math.pi - ja), abs(ja)]) + min([abs(2*math.pi - jd), abs(jd)]) - math.pi
-        '''
-        print 'Attempting to move drake robot to bhpn commanded configuration.'
-        self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
-        startTime = time.time()
-        print "COMMAND DRAKE: ", msg.joint_position
-        if self.perfectControlAndObjectHolding: time.sleep(0.1) #so you have time to see the motion
-        while np.max(np.abs(np.array(msg.joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()) > 0: # and time.time() - startTime < waitTime:
-            print time.time() - startTime
-            print np.abs(np.array(msg.joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()
-            time.sleep(0.1)
-            self.lc.publish('BHPN_ROBOT_STATE_COMMAND', msg.encode())
-        self.lastCommandedDrakeRobotConf = msg
-        print 'Moved drake robot to bhpn commanded configuration.'
 
     ######### Getter methods ##################################################
 
@@ -353,7 +336,7 @@ class BhpnDrakeInterface:
                     pose = self.convertToBhpnPose(
                     msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
                     
-                    pose.theta -= 1.57
+                    pose.theta += 1.57
                     self.bhpnObjectConfs[obj] = pose
                 else:
                     self.bhpnObjectConfs[obj] = self.convertToBhpnPose(
@@ -410,31 +393,6 @@ class BhpnDrakeInterface:
 
     def linkToLinkDrakeTransform(self, link1_name, link2_name):
         return np.array(self.drakePosesXYZQ[link1_name]) - np.array(self.drakePosesXYZQ[link2_name])
-
-    ######### Perfect hold method ############################################
-    def perfectHoldCommander(self):
-        while not self.perfectHoldSenderPoisonPill:
-            tempGrippedObjects = {}
-            gripped = self.robotConnection.grippedObjects(self.contactResults, self.bhpnObjectConfs.keys())
-            for endEffector, grippedObjects in gripped.items():
-                for obj in grippedObjects:
-                    if (endEffector, obj) not in self.grippedObjects:
-                        tempGrippedObjects[(endEffector, obj)] = self.linkToLinkDrakeTransform(obj, endEffector)
-                    else:
-                        tempGrippedObjects[(endEffector, obj)] = self.grippedObjects[(endEffector, obj)]
-            self.grippedObjects = tempGrippedObjects
-            for grip, transform in self.grippedObjects.items():
-                #TODO: make this another message. this is horrible
-                msg = lcmt_robot_state()
-                msg.num_joints = 9;
-                msg.joint_position.append(self.drakePoseIndices[grip[1]][0])
-                msg.joint_position.append(self.drakePoseIndices[grip[1]][1])
-                msg.joint_position += list(transform + np.array(self.drakePosesXYZQ[grip[0]]))
-                msg.joint_robot = [0] * msg.num_joints
-                msg.joint_name = [''] * msg.num_joints
-                msg.joint_velocity = [0.0] * msg.num_joints
-                msg.timestamp = time.time()*1000000
-                self.lc.publish('PERFECT_HOLD_STATE', msg.encode())         
 
     ######### IK planner methods  ############################################
 

@@ -77,7 +77,7 @@ void PidController<T>::CalcControl(const Context<T>& context,
       this->EvalEigenVectorInput(context, input_index_desired_state_);
 
   // State error.
-  const VectorX<T> controlled_state_diff =
+  VectorX<T> controlled_state_diff =
       state_d - (state_selector_.cast<T>() * state);
 
   // Intergral error, which is stored in the continuous state.

@@ -4,7 +4,7 @@ import pymesh
 path_to_objects = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/'
 
 
-def convert(args, transform, mass="25"):
+def convert(args, transform, mass='25', color='white'):
     args = args.split(' ')
     for arg in args:
         mesh = pymesh.load_mesh(arg)
@@ -21,6 +21,7 @@ def convert(args, transform, mass="25"):
         text = template_urdf.read()
         template_urdf.close()
         text = text.replace('object_name', name)
+        text = text.replace('COLOR', color)
         text = text.replace('M', str(mass))
         text = text.replace('R', str(transform[0]))
         text = text.replace('P', str(transform[1]))

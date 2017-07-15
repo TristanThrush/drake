@@ -50,16 +50,15 @@ void main(int argc, char* argv[]) {
   std::vector<Eigen::Vector3d> poses_xyz;
   std::vector<Eigen::Vector3d> poses_rpy;
   std::vector<std::string> fixed;
-  std::string perfect_control = std::string(argv[1]);
-  int num_actuators = std::stoi(argv[2]);
+  int num_actuators = std::stoi(argv[1]);
   Eigen::VectorXd initial_joint_positions(num_actuators);
-  std::string robot_name(argv[num_actuators + 3]);
-
-  for (int index = 3; index < num_actuators + 3; index++) {
-    initial_joint_positions[index - 3] = std::stod(argv[index]);
+  std::string robot_name(argv[num_actuators + 2]);
+  
+  for (int index = 2; index < num_actuators + 2; index++) {
+    initial_joint_positions[index - 2] = std::stod(argv[index]);
   }
 
-  for (int index = num_actuators + 4; index < argc; index++) {
+  for (int index = num_actuators + 3; index < argc; index++) {
     urdf_paths.push_back(argv[index]);
     index++;
     double x = std::stod(argv[index]);
@@ -94,7 +93,6 @@ void main(int argc, char* argv[]) {
     std::cout << actuator.name_ << "\n";
   }
   builder.AddVisualizer(&lcm);
-
   // set up communication with BHPN
   auto status_pub = diagram_builder->AddSystem(
       systems::lcm::LcmPublisherSystem::Make<lcmt_robot_state>(
@@ -111,7 +109,7 @@ auto plan_receiver = diagram_builder->AddSystem(
           "ROBOT_PLAN", &lcm));
   plan_receiver->set_name("plan_receiver");
   
-  auto command_injector = diagram_builder->AddSystem<RobotPlanInterpolator>(FindResourceOrThrow(pr2FixedUrdf));
+  auto command_injector = diagram_builder->AddSystem<RobotPlanInterpolator>(FindResourceOrThrow(urdf_paths[0]));
   command_injector->set_name("command_injector");
   add_pr2_fixed_controller(diagram_builder, plant, world_info[0].instance_id, plan_receiver, command_injector);
   diagram_builder->Connect(plant->model_instance_state_output_port(world_info[0].instance_id), status_sender->get_state_input_port());
@@ -160,7 +158,7 @@ auto plan_receiver = diagram_builder->AddSystem(
       plan_source_context.get_time(),
       initial_joint_positions,
       plan_source_context.get_mutable_state());
-  simulator.StepTo(5000000000);
+  simulator.StepTo(50000000000000);
 }
 }  // namespace bhpn_drake_interface
 }  // namespace examples
