@@ -132,11 +132,11 @@ auto plan_receiver = diagram_builder->AddSystem(
                            contact_results_publisher->get_input_port(0));
 
   //give the plant some contact parameters that encourage the gripping of objects
-  const double kStiffness = 5000;
+  const double kStiffness = 4000;
   const double kDissipation = 2.0;
-  const double kStaticFriction = 4.7;
-  const double kDynamicFriction = 3.7; 
-  const double kVStictionTolerance = 0.5;
+  const double kStaticFriction = 6.7;
+  const double kDynamicFriction = 4.9; 
+  const double kVStictionTolerance = 0.3;
   plant->set_normal_contact_parameters(kStiffness, kDissipation);
   plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                          kVStictionTolerance);

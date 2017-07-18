@@ -48,7 +48,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         self.robotName = 'pr2'
         self.numJoints = 24
         self.urdfPath = 'drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf'
-        self.moveThreshold = np.array([.0075, .0075, .0015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .050, .050, .015, .015, .015, .015, .015, .015, .015, .050, .050])
+        self.moveThreshold = np.array([.015, .015, .0015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .040, .040, .015, .015, .015, .015, .015, .015, .015, .040, .040])
         self.moveThreshold *= 4
 
     def toBhpnRobotConf(self, drakeRobotConf):
@@ -100,7 +100,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
 
     def getContinuousJointListIndices(self):
-        return [5, 7, 9, 14, 16, 18]
+        return [2, 8, 10, 12, 17, 19, 21]
 
     def grippedObjects(self, contact_results, objectsToCheck):
         gripper_end_effector_to_gripped_objects = {'l_gripper_palm_link':[], 'r_gripper_palm_link':[]}
@@ -131,7 +131,7 @@ class BhpnDrakeInterface:
             robotFixed,
             bhpnObjectConfs,
             fixedObjects,
-            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57,3.14159,3.14159,-0.05,0.03,0.04], 2.0, 'purple')}
+            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57,3.14159,3.14159,-0.055,0.03,0.08], 1.0, 'purple')}
             ):
         self.robotName = robotName.lower()
         supportedRobots = {'pr2': Pr2JointsForBaseMovementBhpnDrakeConnection}
@@ -210,6 +210,8 @@ class BhpnDrakeInterface:
                 shape = self.world.objectShapes[obj]
                 transform = [0,0,0,0,0,0]
                 mass = 6.0
+                if obj == 'objA':
+                    mass = 0.005
                 color = 'grey'
             else:
                 shape = self.replacementShapes[obj][0]
@@ -285,6 +287,8 @@ class BhpnDrakeInterface:
                     state.joint_position[continuousJointIndex] -= 2*math.pi
                 if state.joint_position[continuousJointIndex] - lastJointValuesOnPath[continuousJointIndex] < -1*math.pi:
                     state.joint_position[continuousJointIndex] += 2*math.pi
+                assert abs(state.joint_position[continuousJointIndex] - lastJointValuesOnPath[continuousJointIndex]) <= math.pi + 0.01
+            print 'joint_positions: ', state.joint_position
             lastJointValuesOnPath = state.joint_position
             plan.plan.append(state)
         plan.num_grasp_transitions = 0

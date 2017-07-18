@@ -9,13 +9,13 @@ systems::PidController<double>* add_pr2_fixed_controller(systems::DiagramBuilder
   //Create the controller.
   int num_actuators = 24;
   VectorX<double> kp(num_actuators);
-  kp << 2000, 2000, 1500, 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 400, 100, 500, 500, 4000, 4100, 2000, 2000, 300, 400, 100, 500, 500;
+  kp << 2000, 2000, 3000, 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 100, 100, 300, 300, 4000, 4100, 2000, 2000, 300, 100, 100, 300, 300;
   kp *= 0.5;
   VectorX<double> ki(num_actuators);
-  ki << 0, 0, 0, 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15;
+  ki << 0, 0, 15, 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 0, 0, 15, 15, 15, 15, 15, 15, 15, 0, 0;
   ki *= 0.3;
   VectorX<double> kd(num_actuators);
-  kd << 18200, 18200, 7500, 7, 7, 7, 75, 50, 7, 7, 2, 2, 1, 1, 1, 75, 50, 7, 7, 2, 2, 1, 1, 1;
+  kd << 18200, 18200, 7500, 7, 7, 7, 75, 50, 7, 7, 2, 7, 1, 1, 1, 75, 50, 7, 7, 2, 7, 1, 1, 1;
   kd *= 0.1;
   auto Binv = plant->get_rigid_body_tree().B.block(0, 0, num_actuators, num_actuators).inverse();
   auto controller = diagram_builder->AddSystem<systems::PidController<double>>(std::make_unique<systems::PidController<double>>(

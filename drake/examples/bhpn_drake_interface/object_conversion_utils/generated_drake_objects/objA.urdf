@@ -14,19 +14,19 @@
 	</material>
 	<link name="objA">
 		<inertial>
-			<!--origin rpy="1.57 3.14159 0.04" xyz="-0.04 0.04 0.04" /-->
-			<mass value="2.0" />
+			<origin rpy="1.57 3.14159 3.14159" xyz="-0.055 0.03 0.08" />
+			<mass value="1.0" />
 			<!--inertia ixx="0.000360" ixy="0" ixz="0" iyy="0.0000615" iyz="0" izz="0.00036" /-->
 		</inertial>
     		<visual>
-	      		<origin rpy="1.57 3.14159 3.14159" xyz="-0.04 0.04 0.04"/>
+	      		<origin rpy="1.57 3.14159 3.14159" xyz="-0.055 0.03 0.08"/>
       			<geometry>
         			<mesh filename="objA.obj"/>
       			</geometry>
 			<material name="purple" />
          	</visual>
     		<collision>
-      			<origin rpy="1.57 3.14159 3.14159" xyz="-0.04 0.04 0.04"/>
+      			<origin rpy="1.57 3.14159 3.14159" xyz="-0.055 0.03 0.08"/>
       			<geometry>
         			<mesh filename="objA.obj"/>
       			</geometry>
