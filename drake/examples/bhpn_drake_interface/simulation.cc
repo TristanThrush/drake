@@ -12,6 +12,7 @@
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/lcmt_contact_results_for_viz.hpp"
 #include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
+#include "drake/systems/analysis/implicit_euler_integrator.h"
 
 namespace drake {
 namespace examples {
@@ -132,11 +133,11 @@ auto plan_receiver = diagram_builder->AddSystem(
                            contact_results_publisher->get_input_port(0));
 
   //give the plant some contact parameters that encourage the gripping of objects
-  const double kStiffness = 4000;
+  const double kStiffness = 300;
   const double kDissipation = 2.0;
-  const double kStaticFriction = 6.7;
-  const double kDynamicFriction = 4.9; 
-  const double kVStictionTolerance = 0.3;
+  const double kStaticFriction = 2.8;
+  const double kDynamicFriction = 1.9; 
+  const double kVStictionTolerance = 1e-9;
   plant->set_normal_contact_parameters(kStiffness, kDissipation);
   plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                          kVStictionTolerance);
@@ -145,6 +146,14 @@ auto plan_receiver = diagram_builder->AddSystem(
   lcm.StartReceiveThread();
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
   systems::Simulator<double> simulator(*diagram);
+
+
+  //const double dt = 1e-3;
+  //DisableDefaultPublishing(&simulator);
+  //simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram,
+                                              //simulator.get_mutable_context());
+  //simulator.get_mutable_integrator()->set_maximum_step_size(dt);
+  //simulator.get_mutable_integrator()->set_target_accuracy(0.1);
   for (int index = 0;
          index < plant->get_rigid_body_tree().get_num_actuators(); index++) {
       plant->set_position(simulator.get_mutable_context(), index,

@@ -9,7 +9,7 @@ systems::PidController<double>* add_pr2_fixed_controller(systems::DiagramBuilder
   //Create the controller.
   int num_actuators = 24;
   VectorX<double> kp(num_actuators);
-  kp << 2000, 2000, 3000, 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 100, 100, 300, 300, 4000, 4100, 2000, 2000, 300, 100, 100, 300, 300;
+  kp << 2000, 2000, 5000, 800000, 1000, 1000, 4000, 4100, 2000, 2000, 300, 100, 100, 50, 50, 4000, 4100, 2000, 2000, 300, 100, 100, 50, 50;
   kp *= 0.5;
   VectorX<double> ki(num_actuators);
   ki << 0, 0, 15, 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 0, 0, 15, 15, 15, 15, 15, 15, 15, 0, 0;

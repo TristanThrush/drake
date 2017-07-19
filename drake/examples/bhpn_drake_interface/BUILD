@@ -125,6 +125,7 @@ drake_cc_binary(
         "//drake/systems/primitives:constant_vector_source",
 	"//drake/systems/primitives:trajectory_source",
 	"//drake/systems/primitives:multiplexer",
+	"//drake/systems/analysis:implicit_euler_integrator",
 	"//drake/common/trajectories:piecewise_polynomial_trajectory",
         "//drake/common/trajectories:piecewise_polynomial",
 	"//drake/common:find_resource",

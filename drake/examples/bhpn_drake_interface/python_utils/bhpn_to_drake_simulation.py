@@ -17,109 +17,12 @@ import pydrake
 import numpy as np
 import subprocess
 import signal
+from pr2_joints_for_base_movement_bhpn_drake_connection import Pr2JointsForBaseMovementBhpnDrakeConnection
 
 interface_path = 'drake/examples/bhpn_drake_interface/'
 interface_build_path = 'drake/bazel-bin/drake/examples/bhpn_drake_interface/'
 interface_path_absolute = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
 interface_build_path_absolute = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
-
-class RobotBhpnDrakeConnection:
-
-    def __init__(self, bhpnRobotConf):
-        self.bhpnRobotConf = bhpnRobotConf.copy()
-
-    def toBhpnRobotConf(self, drakeRobotConf):
-        raise NotImplementedError
-
-    def toDrakeRobotConf(self, bhpnRobotConf):
-        raise NotImplementedError
-
-    def getUrdfPath(self):
-        raise NotImplementedError
-
-    def getNumJoints(self):
-        raise NotImplementedError
-
-
-class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
-
-    def __init__(self, bhpnRobotConf):
-        RobotBhpnDrakeConnection.__init__(self, bhpnRobotConf)
-        self.robotName = 'pr2'
-        self.numJoints = 24
-        self.urdfPath = 'drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf'
-        self.moveThreshold = np.array([.015, .015, .0015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .040, .040, .015, .015, .015, .015, .015, .015, .015, .040, .040])
-        self.moveThreshold *= 4
-
-    def toBhpnRobotConf(self, drakeRobotConf):
-        drake_joints = drakeRobotConf.joint_position
-        mapping = {'pr2Base': drake_joints[0:3],
-                   'pr2Torso': drake_joints[3:4],
-                   'pr2Head': drake_joints[4:6],
-                   'pr2RightArm': drake_joints[6:13],
-                   'pr2RightGripper': [np.sqrt(drake_joints[13:14][0]/100.0)],
-                   'pr2LeftArm': drake_joints[15:22],
-                   'pr2LeftGripper': [np.sqrt(drake_joints[22:23][0]/100.0)]}
-        for k, v in mapping.items():
-            self.bhpnRobotConf = self.bhpnRobotConf.set(k, list(v))
-        return self.bhpnRobotConf.copy()
-
-    def toDrakeRobotConf(self, bhpnRobotConf):
-        msg = lcmt_robot_state()
-        msg.timestamp = time.time() * 1000000
-        msg.num_joints = self.numJoints
-        msg.joint_position = self.toJointList(bhpnRobotConf)
-        msg.joint_robot = [0] * msg.num_joints
-        msg.joint_name = [''] * msg.num_joints
-        msg.joint_velocity = [0.0] * msg.num_joints
-        print 'msg: ', msg
-        return msg
- 
-    def toJointList(self, bhpnRobotConf):
-        return bhpnRobotConf['pr2Base']\
-            + bhpnRobotConf['pr2Torso']\
-            + bhpnRobotConf['pr2Head']\
-            + bhpnRobotConf['pr2RightArm']\
-            + [min([0.5, 100*bhpnRobotConf['pr2RightGripper'][0]**2])] * 2\
-            + bhpnRobotConf['pr2LeftArm']\
-            + [min([0.5, 100*bhpnRobotConf['pr2LeftGripper'][0]**2])] * 2
-
-    def getJointListNames(self):
-        return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
-    
-    def getUrdfPath(self):
-        return self.urdfPath
-
-    def getNumJoints(self):
-        return self.numJoints
-
-    def getMoveThreshold(self):
-        return self.moveThreshold.copy()
-
-    def handToEndEffector(self):
-        return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
-
-    def getContinuousJointListIndices(self):
-        return [2, 8, 10, 12, 17, 19, 21]
-
-    def grippedObjects(self, contact_results, objectsToCheck):
-        gripper_end_effector_to_gripped_objects = {'l_gripper_palm_link':[], 'r_gripper_palm_link':[]}
-        necessary_collisions_for_l_gripper_grip = set(['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link'])
-        necessary_collisions_for_r_gripper_grip = set(['r_gripper_l_finger_tip_link'])#, 'r_gripper_r_finger_tip_link']) //TODO: figure out why this is.
-        necessary_collisions_combined = set()
-        necessary_collisions_combined.update(necessary_collisions_for_l_gripper_grip)
-        necessary_collisions_combined.update(necessary_collisions_for_r_gripper_grip)
-        for obj in objectsToCheck:
-            objContactsList = map(lambda contact_info: contact_info.body2_name, filter(lambda contact_info: contact_info.body1_name == obj and (contact_info.body2_name in necessary_collisions_combined), contact_results.contact_info))
-            objContactsList += map(lambda contact_info: contact_info.body1_name, filter(lambda contact_info: contact_info.body2_name == obj and (contact_info.body1_name in necessary_collisions_combined), contact_results.contact_info))
-            objContacts = set(objContactsList)
-            if necessary_collisions_for_l_gripper_grip.issubset(objContacts):
-                gripper_end_effector_to_gripped_objects['l_gripper_palm_link'] += [obj]
-            if necessary_collisions_for_r_gripper_grip.issubset(objContacts):
-                gripper_end_effector_to_gripped_objects['r_gripper_palm_link'] += [obj]
-
-        return gripper_end_effector_to_gripped_objects
-        
 
 class BhpnDrakeInterface:
 
@@ -131,7 +34,7 @@ class BhpnDrakeInterface:
             robotFixed,
             bhpnObjectConfs,
             fixedObjects,
-            replacementShapes = {'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57,3.14159,3.14159,-0.055,0.03,0.08], 1.0, 'purple')}
+            replacementShapes = {} #{'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57,3.14159,3.14159,-0.055,0.015,0.08], 0.1, 'purple')}
             ):
         self.robotName = robotName.lower()
         supportedRobots = {'pr2': Pr2JointsForBaseMovementBhpnDrakeConnection}
@@ -146,7 +49,7 @@ class BhpnDrakeInterface:
         self.lastCommandedDrakeRobotConf = None
         self.replacementShapes = replacementShapes
         self.drakePoseIndices = {}
-        self.grippedObjects = {}
+        self.getGrippedObjects = {}
 
         self.world = world.copy()
         self.bhpnRobotConf = bhpnRobotConf.copy()
@@ -210,8 +113,8 @@ class BhpnDrakeInterface:
                 shape = self.world.objectShapes[obj]
                 transform = [0,0,0,0,0,0]
                 mass = 6.0
-                if obj == 'objA':
-                    mass = 0.005
+                if obj == 'objA' or obj == 'sodaA':
+                    mass = 0.015
                 color = 'grey'
             else:
                 shape = self.replacementShapes[obj][0]
@@ -233,7 +136,7 @@ class BhpnDrakeInterface:
     def createDrakeSimulationCommand(self):
         command = interface_build_path_absolute + 'simulation '
         command += str(self.robotConnection.getNumJoints()) + ' '
-        for joint in self.robotConnection.toDrakeRobotConf(
+        for joint in self.robotConnection.getDrakeRobotConf(
                 self.bhpnRobotConf).joint_position:
             command += str(joint) + ' '
         command += self.robotName + ' '
@@ -251,7 +154,7 @@ class BhpnDrakeInterface:
             for value in self.convertToDrakePose(
                     self.bhpnObjectConfs[obj][obj][0]):
                 command += str(value) + ' '
-            if obj in self.fixedObjects:# or obj == 'tableIkea1': #TODO: remove after youve had your fun
+            if obj in self.fixedObjects or obj == 'tableIkea1' or obj == 'tableIkea2': #TODO: remove after youve had your fun
                 command += 'true '
             else:
                 command += 'false '
@@ -278,7 +181,7 @@ class BhpnDrakeInterface:
             state.utime = time[index]
             state.num_joints = self.robotConnection.getNumJoints()
             state.joint_name = self.robotConnection.getJointListNames()
-            state.joint_position = self.robotConnection.toJointList(bhpnPath[index])
+            state.joint_position = self.robotConnection.getJointList(bhpnPath[index])
             state.joint_velocity = [0]*state.num_joints
             state.joint_effort = [0]*state.num_joints
             #modify the plan so that drake wont stupidly take the long way from 0 to 2 pi for continuous joints
@@ -320,7 +223,15 @@ class BhpnDrakeInterface:
         return self.bhpnObjectConfs.copy()
 
     def isGripped(self, hand, obj):
-        return obj in self.robotConnection.grippedObjects(self.contactResults, ['objA'])[self.robotConnection.handToEndEffector()[hand]]
+        return obj in self.robotConnection.getGrippedObjects(self.contactResults, ['objA'])[self.robotConnection.getHandsToEndEffectors()[hand]]
+
+    # BHPN Primitives that are robot-secific, and supported in the interface ##
+
+    def robotSpecificPick(self, startConf, targetConf, hand, obj):
+        return self.robotConnection.pick(startConf, targetConf, hand, obj, self)
+
+    def robotSpecificPlace(self, params, useSM):
+        raise NotImplementedError
 
     ######### LCM methods #####################################################
 
@@ -330,7 +241,7 @@ class BhpnDrakeInterface:
 
     def robotConfCallback(self, channel, data):
         self.drakeRobotConf = lcmt_robot_state.decode(data)
-        self.bhpnRobotConf = self.robotConnection.toBhpnRobotConf(
+        self.bhpnRobotConf = self.robotConnection.getBhpnRobotConf(
             self.drakeRobotConf)
         self.robotConfUpdatedByDrake = True
      
