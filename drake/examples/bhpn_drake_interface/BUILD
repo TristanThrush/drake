@@ -129,6 +129,7 @@ drake_cc_binary(
 	"//drake/common/trajectories:piecewise_polynomial_trajectory",
         "//drake/common/trajectories:piecewise_polynomial",
 	"//drake/common:find_resource",
+	"//drake/common:text_logging_gflags",
 	"@com_github_gflags_gflags//:gflags",
 	"@lcmtypes_robotlocomotion",
     ],

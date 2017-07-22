@@ -28,7 +28,8 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         self.robotName = 'pr2'
         self.numJoints = 24
         self.urdfPath = 'drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf'
-        self.moveThreshold = np.array([.015, .015, .0015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .015, .040, .040, .015, .015, .015, .015, .015, .015, .015, .040, .040])
+        self.originalMoveThreshold = np.array([.015, .015, .015, .012, .012, .012, .012, .012, .012, .012, .012, .012, .012, .015, .015, .012, .012, .012, .012, .012, .012, .012, .015, .015])
+        self.moveThreshold = self.originalMoveThreshold.copy()
         self.moveThreshold *= 4
 
     def getBhpnRobotConf(self, drakeRobotConf):
@@ -76,8 +77,18 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
     def getMoveThreshold(self):
         return self.moveThreshold.copy()
 
+    def setIgnoredMoveThreshold(self, index, ignore):
+        if ignore:
+            self.moveThreshold[index] = float('inf')
+        else:
+            self.moveThreshold[index] = self.originalMoveThreshold[index]
+        
+
     def getHandsToEndEffectors(self):
         return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
+
+    def getDrakeHandJointIndices(self):
+        return {'left': (22, 23), 'right': (13, 14)}
 
     def getContinuousJointListIndices(self):
         return [2, 8, 10, 12, 17, 19, 21]
@@ -112,7 +123,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         targetConf.prettyPrint()
 
         stepTime = 100000
-        fingerOverlapLength = 0.05
+        fingerOverlapLength = 0.08
         widthOpen = 0.07
         minWidthClosed = 0.035
 
@@ -120,13 +131,13 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         startConfOpen = startConf.set(startConf.robot.gripperChainNames[hand], [widthOpen])
         targetConfOpen = targetConf.set(targetConf.robot.gripperChainNames[hand], [widthOpen])
         path = rrt.interpolatePath([bhpnDrakeInterfaceObj.getBhpnRobotConf(), startConfOpen, targetConfOpen], 0.01)
-        plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [step*stepTime for step in range(len(path))])
-        bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
+        #plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [step*stepTime for step in range(len(path))])
+        #bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
 
         #move gripper right around object
         
-        nConf = displaceHand(targetConfOpen, hand, dx=fingerOverlapLength, dz=0.0, nearTo=targetConfOpen)
-        path = rrt.interpolatePath([bhpnDrakeInterfaceObj.getBhpnRobotConf(), nConf], 0.01)
+        nConf = displaceHand(targetConfOpen, hand, dx=fingerOverlapLength, dz=-0.1, nearTo=targetConfOpen)
+        path += rrt.interpolatePath([targetConfOpen, nConf], 0.01)
         plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [step*stepTime for step in range(len(path))])
         bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
         
@@ -134,29 +145,41 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         
         startTime = time.time()
         while not bhpnDrakeInterfaceObj.isGripped(hand, obj):
+            loopStepTime = 1
             nConf = nConf.set(nConf.robot.gripperChainNames[hand], [max([minWidthClosed, nConf[nConf.robot.gripperChainNames[hand]][0] - 0.001])])
-            plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath([bhpnDrakeInterfaceObj.getBhpnRobotConf(), nConf], [0, 100000])
+            path = [nConf, nConf]
+            #path = rrt.interpolatePath([bhpnDrakeInterfaceObj.getBhpnRobotConf(), nConf], 0.001)
+            plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [step*loopStepTime for step in range(len(path))])
             bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
+            #time.sleep(5) #TODO: this is hacky. get rid of it.
             if time.time() - startTime > timeout:
                 return False
         
-        #if the object has been gripped, then pick it up
+        loopStepTime = 1
+        nConf = nConf.set(nConf.robot.gripperChainNames[hand], [max([minWidthClosed, nConf[nConf.robot.gripperChainNames[hand]][0] - 0.03])])
+        path = [nConf, nConf]
+            #path = rrt.interpolatePath([bhpnDrakeInterfaceObj.getBhpnRobotConf(), nConf], 0.001)
+        plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [step*loopStepTime for step in range(len(path))])
+        bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
+        
         '''
+        #if the object has been gripped, then pick it up
         nConfUp = displaceHand(targetConfOpen, hand, dx=fingerOverlapLength, dz=0.05, nearTo=targetConfOpen)
         nConfUpClosed = nConfUp.set(nConfUp.robot.gripperChainNames[hand], nConf[nConfUp.robot.gripperChainNames[hand]])
         path = [bhpnDrakeInterfaceObj.getBhpnRobotConf(), nConfUpClosed]
-        plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [0, 500000])
-        bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
+        #plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [0, 500000])
+        #bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
         '''
+        
         startConfClosed = startConf.set(startConf.robot.gripperChainNames[hand], nConf[nConf.robot.gripperChainNames[hand]])
-        path = rrt.interpolatePath([bhpnDrakeInterfaceObj.getBhpnRobotConf(), startConfClosed], 0.1)
+        path = rrt.interpolatePath([bhpnDrakeInterfaceObj.getBhpnRobotConf(), startConfClosed], 0.01)
         plan = bhpnDrakeInterfaceObj.encodeDrakeRobotPlanFromBhpnPath(path, [step*stepTime for step in range(len(path))])
         bhpnDrakeInterfaceObj.commandDrakeRobotPlan(plan)
         
         return bhpnDrakeInterfaceObj.isGripped(hand, obj)
 
 #TODO: get rid of this! it uses non-drake invKin
-def displaceHand(conf, hand, dx=0.0, dy=0.0, dz=0.0,
+def displaceHand(conf, hand, dx=0.0, dy=0.07, dz=0.0,
                  zFrom=None, maxTarget=None, nearTo=None):
     print 'displaceHand'
     cart = conf.cartConf()

@@ -34,7 +34,7 @@ class BhpnDrakeInterface:
             robotFixed,
             bhpnObjectConfs,
             fixedObjects,
-            replacementShapes = {} #{'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_graspable_soda.off'), [1.57,3.14159,3.14159,-0.055,0.015,0.08], 0.1, 'purple')}
+            replacementShapes = {} #{'objA': (shapes.readOff('/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/object_conversion_utils/drake_really_graspable_soda.off'), [1.57,3.14159,3.14159,-0.055,0.015,0.08], 0.05, 'purple')}
             ):
         self.robotName = robotName.lower()
         supportedRobots = {'pr2': Pr2JointsForBaseMovementBhpnDrakeConnection}
@@ -112,7 +112,7 @@ class BhpnDrakeInterface:
             if obj not in self.replacementShapes:
                 shape = self.world.objectShapes[obj]
                 transform = [0,0,0,0,0,0]
-                mass = 6.0
+                mass = 100.0
                 if obj == 'objA' or obj == 'sodaA':
                     mass = 0.015
                 color = 'grey'
@@ -131,6 +131,10 @@ class BhpnDrakeInterface:
             bhpn_to_drake_object.convert(
                 path_to_objects + 'generated_bhpn_objects/' + obj + '.off', transform, mass, color)
             objectFiles[obj] = 'drake/examples/bhpn_drake_interface/object_conversion_utils/generated_drake_objects/' + obj + '.urdf '
+        objectFiles = {}
+        #objectFiles['objA'] = 'drake/examples/bhpn_drake_interface/object_conversion_utils/objA.urdf '
+        objectFiles['drake_table'] = 'drake/examples/bhpn_drake_interface/objects/drake_table.sdf '
+        objectFiles['drake_soda'] = 'drake/examples/bhpn_drake_interface/objects/drake_soda.urdf '
         return objectFiles
 
     def createDrakeSimulationCommand(self):
@@ -141,7 +145,7 @@ class BhpnDrakeInterface:
             command += str(joint) + ' '
         command += self.robotName + ' '
         command += self.robotConnection.getUrdfPath() + ' '
-        for value in self.convertToDrakePose(self.initialBhpnRobotPose):
+        for value in [0., 0., 0., 0., 0., 0.]: # TODO: fix! self.convertToDrakePose(self.initialBhpnRobotPose):
             command += str(value) + ' '
         command += str(self.robotFixed).lower() + ' '
         position_index_number = 0
@@ -151,10 +155,15 @@ class BhpnDrakeInterface:
         position_index_number += self.robotConnection.getNumJoints()
         for obj in self.objectFiles:
             command += self.objectFiles[obj]
-            for value in self.convertToDrakePose(
-                    self.bhpnObjectConfs[obj][obj][0]):
-                command += str(value) + ' '
-            if obj in self.fixedObjects or obj == 'tableIkea1' or obj == 'tableIkea2': #TODO: remove after youve had your fun
+            objPose = self.convertToDrakePose(self.bhpnObjectConfs[obj][obj][0])
+            
+            if obj == 'drake_table':
+                objPose[2] -= .4095 #TODO: fix!
+            if obj == 'drake_soda':
+                objPose[2] -= .06 #TODO: fix!
+            for value in objPose:
+                    command += str(value) + ' '
+            if obj in self.fixedObjects:
                 command += 'true '
             else:
                 command += 'false '
@@ -208,7 +217,20 @@ class BhpnDrakeInterface:
         #TODO: think about the best way to consider this plan finished
         
         while np.max(np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()) > 0:
+            
+            #if an object is gripped relax threshold for the gripper
+            gripped = self.robotConnection.getGrippedObjects(self.contactResults, self.getBhpnObjectConfs().keys())
+            for hand, endEffector in self.robotConnection.getHandsToEndEffectors().items():
+                print gripped[endEffector]
+                if gripped[endEffector] != []:
+                    for index in self.robotConnection.getDrakeHandJointIndices()[hand]:
+                        self.robotConnection.setIgnoredMoveThreshold(index, True)
+                else:
+                    for index in self.robotConnection.getDrakeHandJointIndices()[hand]:
+                        self.robotConnection.setIgnoredMoveThreshold(index, False)
+            
             print np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drakeRobotConf.joint_position)) - self.robotConnection.getMoveThreshold()
+
             time.sleep(0.1)
         
         #time.sleep(plan.plan[-1].utime/20000.0)
@@ -223,7 +245,7 @@ class BhpnDrakeInterface:
         return self.bhpnObjectConfs.copy()
 
     def isGripped(self, hand, obj):
-        return obj in self.robotConnection.getGrippedObjects(self.contactResults, ['objA'])[self.robotConnection.getHandsToEndEffectors()[hand]]
+        return obj in self.robotConnection.getGrippedObjects(self.contactResults, [obj])[self.robotConnection.getHandsToEndEffectors()[hand]]
 
     # BHPN Primitives that are robot-secific, and supported in the interface ##
 
@@ -248,8 +270,17 @@ class BhpnDrakeInterface:
     def objectPoseCallback(self, channel, data):
         msg = lcmt_viewer_draw.decode(data)
         for obj in self.bhpnObjectConfs:
-            self.bhpnObjectConfs[obj] = self.convertToBhpnPose(
+            
+            objPose = self.convertToBhpnPose(
             msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
+            if obj == 'drake_table':
+                #print 'z before: ', objPose.z
+                objPose.z += .4095 #TODO: fix!
+                #print 'z after: ', objPose.z
+            if obj == 'drake_soda':
+                objPose.z += .06 #TODO: fix!
+            self.bhpnObjectConfs[obj] = objPose
+            #print self.getBhpnObjectConfs()[obj].z
 
         #print self.bhpnObjectConfs
         for obj in msg.link_name:

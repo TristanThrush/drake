@@ -1,4 +1,6 @@
 #include "robotlocomotion/robot_plan_t.hpp"
+#include <gflags/gflags.h>
+#include "drake/common/text_logging_gflags.h"
 #include "drake/common/find_resource.h"
 #include "drake/examples/bhpn_drake_interface/lcm_utils/robot_state_lcm.h"
 #include "drake/examples/bhpn_drake_interface/simulation_utils/sim_diagram_builder.h"
@@ -133,14 +135,16 @@ auto plan_receiver = diagram_builder->AddSystem(
                            contact_results_publisher->get_input_port(0));
 
   //give the plant some contact parameters that encourage the gripping of objects
-  const double kStiffness = 300;
-  const double kDissipation = 2.0;
-  const double kStaticFriction = 2.8;
-  const double kDynamicFriction = 1.9; 
-  const double kVStictionTolerance = 1e-9;
+  
+  const double kStiffness = 4000;
+  const double kDissipation = 10.0;
+  
+  //const double kStaticFriction = 0.9;
+  //const double kDynamicFriction = 0.3; 
+  //const double kVStictionTolerance = 0.5;
   plant->set_normal_contact_parameters(kStiffness, kDissipation);
-  plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
-                                         kVStictionTolerance);
+  //plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
+                                         //kVStictionTolerance);
 
   //Initialize the starting configuration of the joints, initialize the command_injector, and start the simulation.
   lcm.StartReceiveThread();
@@ -148,32 +152,34 @@ auto plan_receiver = diagram_builder->AddSystem(
   systems::Simulator<double> simulator(*diagram);
 
 
-  //const double dt = 1e-3;
-  //DisableDefaultPublishing(&simulator);
-  //simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram,
-                                              //simulator.get_mutable_context());
-  //simulator.get_mutable_integrator()->set_maximum_step_size(dt);
-  //simulator.get_mutable_integrator()->set_target_accuracy(0.1);
+  const double dt = 1e-3;
+  //simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram, simulator.get_mutable_context());
+  simulator.get_mutable_integrator()->set_maximum_step_size(dt);
+  //simulator.get_mutable_integrator()->set_target_accuracy(0.5);
+
   for (int index = 0;
          index < plant->get_rigid_body_tree().get_num_actuators(); index++) {
       plant->set_position(simulator.get_mutable_context(), index,
                           initial_joint_positions[index]);
   }
   simulator.Initialize();
-  simulator.set_target_realtime_rate(10.0);
+  simulator.set_target_realtime_rate(1.0);
+  //simulator.get_mutable_integrator()->set_maximum_step_size(1e-3);
   auto& plan_source_context = diagram->GetMutableSubsystemContext(
       *command_injector, simulator.get_mutable_context());
   command_injector->Initialize(
       plan_source_context.get_time(),
       initial_joint_positions,
       plan_source_context.get_mutable_state());
-  simulator.StepTo(50000000000000);
+  simulator.StepTo(500000000000);
 }
 }  // namespace bhpn_drake_interface
 }  // namespace examples
 }  // namespace drake
 
 int main(int argc, char* argv[]) {
+  //gflags::ParseCommandLineFlags(&argc, &argv, true);
+  //drake::logging::HandleSpdlogGflags();
   drake::examples::bhpn_drake_interface::main(argc, argv);
   return 0;
 }

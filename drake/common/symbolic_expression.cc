@@ -1,5 +1,4 @@
-#include "drake/common/symbolic_expression.h"
-
+// NOLINTNEXTLINE(build/include): Its header file is included in symbolic.h.
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -13,11 +12,10 @@
 
 #include "drake/common/drake_assert.h"
 #include "drake/common/never_destroyed.h"
-#include "drake/common/symbolic_environment.h"
+#include "drake/common/symbolic.h"
+#define DRAKE_COMMON_SYMBOLIC_DETAIL_HEADER
 #include "drake/common/symbolic_expression_cell.h"
-#include "drake/common/symbolic_formula.h"
-#include "drake/common/symbolic_variable.h"
-#include "drake/common/symbolic_variables.h"
+#undef DRAKE_COMMON_SYMBOLIC_DETAIL_HEADER
 
 namespace drake {
 namespace symbolic {
@@ -150,7 +148,7 @@ bool Expression::is_polynomial() const {
   return ptr_->is_polynomial();
 }
 
-Polynomial<double> Expression::ToPolynomial() const {
+Polynomiald Expression::ToPolynomial() const {
   DRAKE_ASSERT(ptr_ != nullptr);
   return ptr_->ToPolynomial();
 }
@@ -684,6 +682,22 @@ Expression max(const Expression& e1, const Expression& e2) {
   return Expression{make_shared<ExpressionMax>(e1, e2)};
 }
 
+Expression ceil(const Expression& e) {
+  // Simplification: constant folding.
+  if (is_constant(e)) {
+    return Expression{std::ceil(get_constant_value(e))};
+  }
+  return Expression{make_shared<ExpressionCeiling>(e)};
+}
+
+Expression floor(const Expression& e) {
+  // Simplification: constant folding.
+  if (is_constant(e)) {
+    return Expression{std::floor(get_constant_value(e))};
+  }
+  return Expression{make_shared<ExpressionFloor>(e)};
+}
+
 Expression if_then_else(const Formula& f_cond, const Expression& e_then,
                         const Expression& e_else) {
   // simplification:: if(true, e1, e2) => e1
@@ -733,6 +747,8 @@ bool is_cosh(const Expression& e) { return is_cosh(*e.ptr_); }
 bool is_tanh(const Expression& e) { return is_tanh(*e.ptr_); }
 bool is_min(const Expression& e) { return is_min(*e.ptr_); }
 bool is_max(const Expression& e) { return is_max(*e.ptr_); }
+bool is_ceil(const Expression& e) { return is_ceil(*e.ptr_); }
+bool is_floor(const Expression& e) { return is_floor(*e.ptr_); }
 bool is_if_then_else(const Expression& e) { return is_if_then_else(*e.ptr_); }
 bool is_uninterpreted_function(const Expression& e) {
   return is_uninterpreted_function(*e.ptr_);

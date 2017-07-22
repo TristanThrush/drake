@@ -9,8 +9,8 @@
 #include "drake/common/eigen_autodiff_types.h"
 #include "drake/common/eigen_types.h"
 #include "drake/multibody/kinematics_cache.h"
-#include "drake/solvers/mathematical_program.h"
 #include "drake/multibody/rigid_body_plant/compliant_contact_model.h"
+#include "drake/solvers/mathematical_program.h"
 
 using std::make_unique;
 using std::move;
@@ -19,7 +19,7 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-using DrakeCollision::ElementId;
+using drake::multibody::collision::ElementId;
 
 namespace drake {
 namespace systems {

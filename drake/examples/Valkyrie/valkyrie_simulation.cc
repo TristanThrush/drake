@@ -30,6 +30,14 @@ int main() {
 
   // Set initial state.
   auto plant = diagram.get_mutable_plant();
+  
+  //Added by Tristan.
+  std::cout << "actuators: "
+            << "\n";
+  for (RigidBodyActuator actuator : plant->get_rigid_body_tree().actuators) {
+    std::cout << actuator.name_ << "\n";
+  }
+  
   auto& plant_context = diagram.GetMutableSubsystemContext(*plant, context);
 
   // TODO(tkoolen): make it easy to specify a different initial configuration.
