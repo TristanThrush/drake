@@ -27,8 +27,8 @@ filegroup(
 
 drake_cc_library(
     name = "robot_state_lcm",
-    srcs = ["lcm_utils/robot_state_lcm.cc"],
-    hdrs = ["lcm_utils/robot_state_lcm.h"],
+    srcs = ["src/lcm_utils/robot_state_lcm.cc"],
+    hdrs = ["src/lcm_utils/robot_state_lcm.h"],
     deps = [
         "//drake/lcmtypes:robot_state",
         "//drake/multibody:rigid_body_tree",
@@ -38,8 +38,8 @@ drake_cc_library(
 
 drake_cc_library(
     name = "sim_diagram_builder",
-    srcs = ["simulation_utils/sim_diagram_builder.cc"],
-    hdrs = ["simulation_utils/sim_diagram_builder.h"],
+    srcs = ["src/simulation_utils/sim_diagram_builder.cc"],
+    hdrs = ["src/simulation_utils/sim_diagram_builder.h"],
     deps = [
         "//drake/multibody/rigid_body_plant",
         "//drake/multibody/rigid_body_plant:drake_visualizer",
@@ -50,8 +50,8 @@ drake_cc_library(
 
 drake_cc_library(
     name = "world_sim_tree_builder",
-    srcs = ["simulation_utils/world_sim_tree_builder.cc"],
-    hdrs = ["simulation_utils/world_sim_tree_builder.h"],
+    srcs = ["src/simulation_utils/world_sim_tree_builder.cc"],
+    hdrs = ["src/simulation_utils/world_sim_tree_builder.h"],
     deps = [
         "//drake/common:unused",
 	"//drake/common:find_resource",
@@ -64,8 +64,8 @@ drake_cc_library(
 
 drake_cc_library(
     name = "robot_plan_interpolator",
-    srcs = ["lcm_utils/robot_plan_interpolator.cc"],
-    hdrs = ["lcm_utils/robot_plan_interpolator.h"],
+    srcs = ["src/lcm_utils/robot_plan_interpolator.cc"],
+    hdrs = ["src/lcm_utils/robot_plan_interpolator.h"],
     deps = [
         "//drake/common/trajectories:piecewise_polynomial",
         "//drake/multibody:rigid_body_tree",
@@ -78,8 +78,8 @@ drake_cc_library(
 
 drake_cc_library(
     name = "pr2_fixed_controller",
-    srcs = ["controllers/pr2_fixed_controller.cc"],
-    hdrs = ["controllers/pr2_fixed_controller.h"],
+    srcs = ["src/controllers/pr2_fixed_controller.cc"],
+    hdrs = ["src/controllers/pr2_fixed_controller.h"],
     deps = [
         ":robot_state_lcm",
 	":robot_plan_interpolator",
@@ -107,7 +107,7 @@ drake_cc_library(
 
 drake_cc_binary(
     name = "simulation",
-    srcs = ["simulation.cc", "controllers/pr2_fixed_controller.cc"],
+    srcs = ["src/simulation.cc"],
     deps = [
         ":robot_state_lcm",
 	":pr2_fixed_controller",

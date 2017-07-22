@@ -1,0 +1,188 @@
+import os
+import multiprocessing
+from robot import rrt
+import subprocess
+import threading
+from geometry import shapes, hu
+from robot import conf
+import lcm
+from drake import lcmt_robot_state, lcmt_viewer_draw, lcmt_contact_results_for_viz
+from bot_core import robot_state_t
+from robotlocomotion import robot_plan_t
+from operator import sub
+import time
+import atexit
+import math
+import pydrake
+import numpy as np
+import subprocess
+import signal
+#TODO: get rid of unused imports
+from robot_bhpn_drake_connection import RobotBhpnDrakeConnection
+
+class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
+
+    def __init__(self, bhpn_robot_conf):
+        RobotBhpnDrakeConnection.__init__(self, bhpn_robot_conf)
+        self.robot_type = 'pr2'
+        self.num_joints = 24
+        self.urdf_path = 'drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf'
+        self.original_move_threshold = np.array([.015, .015, .015, .012, .012, .012, .012, .012, .012, .012, .012, .012, .012, .015, .015, .012, .012, .012, .012, .012, .012, .012, .015, .015])
+        self.move_threshold = self.original_move_threshold.copy()
+        self.move_threshold *= 4
+
+    def get_bhpn_robot_conf(self, drake_robot_conf):
+        drake_joints = drake_robot_conf.joint_position
+        mapping = {'pr2Base': drake_joints[0:3],
+                   'pr2Torso': drake_joints[3:4],
+                   'pr2Head': drake_joints[4:6],
+                   'pr2RightArm': drake_joints[6:13],
+                   'pr2RightGripper': [np.sqrt(drake_joints[13:14][0]/100.0)],
+                   'pr2LeftArm': drake_joints[15:22],
+                   'pr2LeftGripper': [np.sqrt(drake_joints[22:23][0]/100.0)]}
+        for k, v in mapping.items():
+            self.bhpn_robot_conf = self.bhpn_robot_conf.set(k, list(v))
+        return self.bhpn_robot_conf.copy()
+
+    def get_drake_robot_conf(self, bhpn_robot_conf):
+        msg = lcmt_robot_state()
+        msg.timestamp = time.time() * 1000000
+        msg.num_joints = self.num_joints
+        msg.joint_position = self.get_joint_list(bhpn_robot_conf)
+        msg.joint_robot = [0] * msg.num_joints
+        msg.joint_name = [''] * msg.num_joints
+        msg.joint_velocity = [0.0] * msg.num_joints
+        print 'msg: ', msg
+        return msg
+ 
+    def get_joint_list(self, bhpn_robot_conf):
+        return bhpn_robot_conf['pr2Base']\
+            + bhpn_robot_conf['pr2Torso']\
+            + bhpn_robot_conf['pr2Head']\
+            + bhpn_robot_conf['pr2RightArm']\
+            + [min([0.5, 100*bhpn_robot_conf['pr2RightGripper'][0]**2])] * 2\
+            + bhpn_robot_conf['pr2LeftArm']\
+            + [min([0.5, 100*bhpn_robot_conf['pr2LeftGripper'][0]**2])] * 2
+
+    def get_joint_list_names(self):
+        return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
+    
+    def get_urdf_path(self):
+        return self.urdf_path
+
+    def get_num_joints(self):
+        return self.num_joints
+
+    def get_move_threshold(self):
+        return self.move_threshold.copy()
+
+    def set_ignored_move_threshold(self, index, ignore):
+        if ignore:
+            self.move_threshold[index] = float('inf')
+        else:
+            self.move_threshold[index] = self.original_move_threshold[index]
+        
+
+    def get_hands_to_end_effectors(self):
+        return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
+
+    def get_drake_hand_joint_indices(self):
+        return {'left': (22, 23), 'right': (13, 14)}
+
+    def get_drake_continuous_joint_indices(self):
+        return (2, 8, 10, 12, 17, 19, 21)
+
+    def get_gripped_objects(self, contact_results, objects_to_check):
+        #TODO: make this method force-sensitive.
+        gripper_end_effector_to_gripped_objects = {'l_gripper_palm_link':[], 'r_gripper_palm_link':[]}
+        necessary_collisions_for_l_gripper_grip = set(['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link'])
+        necessary_collisions_for_r_gripper_grip = set(['r_gripper_l_finger_tip_link', 'r_gripper_r_finger_tip_link'])
+        necessary_collisions_combined = set()
+        necessary_collisions_combined.update(necessary_collisions_for_l_gripper_grip)
+        necessary_collisions_combined.update(necessary_collisions_for_r_gripper_grip)
+        for obj in objects_to_check:
+            obj_contacts_list = map(lambda contact_info: contact_info.body2_name, filter(lambda contact_info: contact_info.body1_name == obj and (contact_info.body2_name in necessary_collisions_combined), contact_results.contact_info))
+            obj_contacts_list += map(lambda contact_info: contact_info.body1_name, filter(lambda contact_info: contact_info.body2_name == obj and (contact_info.body1_name in necessary_collisions_combined), contact_results.contact_info))
+            obj_contacts = set(obj_contacts_list)
+            if necessary_collisions_for_l_gripper_grip.issubset(obj_contacts):
+                gripper_end_effector_to_gripped_objects['l_gripper_palm_link'] += [obj]
+            if necessary_collisions_for_r_gripper_grip.issubset(obj_contacts):
+                gripper_end_effector_to_gripped_objects['r_gripper_palm_link'] += [obj]
+        
+        return gripper_end_effector_to_gripped_objects
+
+    def pick(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj, timeout=60):
+        # Basic picking procedure. Not really that reactive (except it does ensure that the object is gripped hard enough). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
+        
+        # Constants
+        step_time = 100000
+        dx = 0.08
+        dy = 0.07
+        dz = -0.1
+        width_open = 0.07
+        min_width_closed = 0.035
+
+        # Move gripper around object.
+        start_conf_open = start_conf.set(start_conf.robot.gripperChainNames[hand], [width_open])
+        target_conf_open = target_conf.set(target_conf.robot.gripperChainNames[hand], [width_open])
+        path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_open, target_conf_open], 0.01)
+        n_conf = displaceHand(target_conf_open, hand, dx, dy, dz, nearTo=target_conf_open)
+        path += rrt.interpolatePath([target_conf_open, n_conf], 0.01)
+        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
+        bhpn_drake_interface_obj.command_drake_robot_plan(plan)
+        
+        # Move the fingers around the object and stop when we have gripped it hard enough or when the time to try is over ("hard enough" for this robot is defined by isGripped)
+        start_time = time.time()
+        while not bhpn_drake_interface_obj.is_gripped(hand, obj):
+            n_conf = n_conf.set(n_conf.robot.gripperChainNames[hand], [max([min_width_closed, n_conf[n_conf.robot.gripperChainNames[hand]][0] - 0.001])])
+            path = [n_conf, n_conf]
+            plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step for step in range(len(path))])
+            bhpn_drake_interface_obj.command_drake_robot_plan(plan)
+            if time.time() - start_time > timeout:
+                return False
+        
+        # TODO: you wouldnt have to do this if you get the force sensitive gripping working.
+        n_conf = n_conf.set(n_conf.robot.gripperChainNames[hand], [max([min_width_closed, n_conf[n_conf.robot.gripperChainNames[hand]][0] - 0.03])])
+        path = [n_conf, n_conf]
+        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step for step in range(len(path))])
+        bhpn_drake_interface_obj.command_drake_robot_plan(plan)
+        
+        # Return to where the gripper started, holding the object.
+        start_conf_closed = start_conf.set(start_conf.robot.gripperChainNames[hand], n_conf[n_conf.robot.gripperChainNames[hand]])
+        path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_closed], 0.01)
+        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
+        bhpn_drake_interface_obj.command_drake_robot_plan(plan)
+        
+        return bhpn_drake_interface_obj.is_gripped(hand, obj)
+
+#TODO: get rid of this! it uses non-drake invKin
+def displaceHand(conf, hand, dx=0.0, dy=0.0, dz=0.0,
+                 zFrom=None, maxTarget=None, nearTo=None):
+    print 'displaceHand'
+    cart = conf.cartConf()
+    robot = conf.robot
+    handFrameName = robot.armChainNames[hand]
+    trans = cart[handFrameName]
+    if zFrom:
+        diff = trans.inverse().compose(zFrom.cartConf()[handFrameName])
+        dz = diff.matrix[2,3]
+        print 'trans\n', trans.matrix
+        print 'zFrom\n', zFrom.cartConf()[handFrameName].matrix
+        print 'dz', dz
+    if maxTarget:
+        diff = trans.inverse().compose(maxTarget.cartConf()[handFrameName])
+        max_dx = diff.matrix[0,3]
+        print 'displaceHand', 'dx', dx, 'max_dx', max_dx
+        dx = max(0., min(dx, max_dx)) # don't go past maxTrans
+    nTrans = trans.compose(hu.Pose(dx, dy, dz, 0.0))
+    basePose = (nearTo or conf).basePose()
+    robot = conf.robot
+    for n_conf in robot.inverseKinWristGen(nTrans, hand, (nearTo or conf),
+                                                basePose=basePose):
+        if n_conf['pr2Head'] is None:
+            # Catch an apparent asymmetry in forward/inverse kin.
+            n_conf.conf['pr2Head'] = conf.conf['pr2Head']
+        n_conf.prettyPrint('displaceHand Conf:')
+        return n_conf
+    print 'displaceHand: failed kinematics'
+    return conf
