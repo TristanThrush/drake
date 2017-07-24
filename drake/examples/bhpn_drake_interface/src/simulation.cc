@@ -13,6 +13,7 @@
 #include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/systems/analysis/implicit_euler_integrator.h"
+#include "drake/systems/analysis/runge_kutta3_integrator.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
@@ -159,7 +160,7 @@ void main(int argc, char* argv[]) {
 
   // Give the plant some contact parameters that encourage the gripping of
   // objects.
-
+/*
   const double kStiffness = 3000;
   const double kDissipation = 10.0;
 
@@ -167,19 +168,13 @@ void main(int argc, char* argv[]) {
   const double kDynamicFriction = 1.0;
   const double kVStictionTolerance = 1e-5;
   plant->set_normal_contact_parameters(kStiffness, kDissipation);
-  plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction, kVStictionTolerance);
+  plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction, kVStictionTolerance);*/
 
   // Initialize the starting configuration of the joints, initialize the
   // command_injector, and start the simulation.
   lcm.StartReceiveThread();
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
   systems::Simulator<double> simulator(*diagram);
-
-  const double dt = 1e-3;
-  // simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram,
-  // simulator.get_mutable_context());
-  simulator.get_mutable_integrator()->set_maximum_step_size(dt);
-  // simulator.get_mutable_integrator()->set_target_accuracy(0.5);
 
   for (int index = 0; index < plant->get_rigid_body_tree().get_num_actuators();
        index++) {
@@ -191,17 +186,24 @@ void main(int argc, char* argv[]) {
   command_injector->Initialize(plan_source_context.get_time(),
                                initial_joint_positions,
                                plan_source_context.get_mutable_state());
+
+  const double dt = 1e-3;
+  simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram,
+  simulator.get_mutable_context());
+  simulator.get_mutable_integrator()->set_maximum_step_size(dt);
+  simulator.get_mutable_integrator()->set_target_accuracy(5e-1);
+
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
-  simulator.StepTo(500000000000);
+  simulator.StepTo(.1);
 }
 }  // namespace bhpn_drake_interface
 }  // namespace examples
 }  // namespace drake
 
 int main(int argc, char* argv[]) {
-  // gflags::ParseCommandLineFlags(&argc, &argv, true);
-  // drake::logging::HandleSpdlogGflags();
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  drake::logging::HandleSpdlogGflags();
   drake::examples::bhpn_drake_interface::main(argc, argv);
   return 0;
 }
