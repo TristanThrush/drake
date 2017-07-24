@@ -181,7 +181,10 @@ class BhpnDrakeInterface:
 
         # Wait for plan to be recieved.
         print "Waiting for plan to be recieved."
-        while self.plan_status.last_plan_start_utime == last_plan_start_utime:
+        # TODO: fix this!
+        counter = 0
+        while self.plan_status.last_plan_start_utime == last_plan_start_utime and counter < 50:
+            counter += 1
             time.sleep(0.1)
         print self.plan_status.last_plan_start_utime
         print "Plan recieved."
@@ -210,9 +213,8 @@ class BhpnDrakeInterface:
     def pick(self, start_conf, target_conf, hand, obj):
         return self.robot_connection.pick(start_conf, target_conf, hand, obj, self)
 
-    def place(self):
-        # TODO: implement.
-        raise NotImplementedError
+    def place(self, start_conf, target_conf, hand, obj):
+        return self.robot_connection.place(start_conf, target_conf, hand, obj, self)
 
     ######### LCM methods #####################################################
 

@@ -160,15 +160,15 @@ void main(int argc, char* argv[]) {
 
   // Give the plant some contact parameters that encourage the gripping of
   // objects.
-/*
-  const double kStiffness = 3000;
-  const double kDissipation = 10.0;
 
-  const double kStaticFriction = 1.8;
-  const double kDynamicFriction = 1.0;
-  const double kVStictionTolerance = 1e-5;
-  plant->set_normal_contact_parameters(kStiffness, kDissipation);
-  plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction, kVStictionTolerance);*/
+  //const double kStiffness = 3000;
+  //const double kDissipation = 10.0;
+
+  const double kStaticFriction = 0.9;
+  const double kDynamicFriction = 0.4;
+  const double kVStictionTolerance = 1e-7;
+  //plant->set_normal_contact_parameters(kStiffness, kDissipation);
+  plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction, kVStictionTolerance);
 
   // Initialize the starting configuration of the joints, initialize the
   // command_injector, and start the simulation.
@@ -188,22 +188,22 @@ void main(int argc, char* argv[]) {
                                plan_source_context.get_mutable_state());
 
   const double dt = 1e-3;
-  simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram,
-  simulator.get_mutable_context());
+  //simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram,
+  //simulator.get_mutable_context());
   simulator.get_mutable_integrator()->set_maximum_step_size(dt);
-  simulator.get_mutable_integrator()->set_target_accuracy(5e-1);
+  //simulator.get_mutable_integrator()->set_target_accuracy(5e-1);
 
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
-  simulator.StepTo(.1);
+  simulator.StepTo(999999999999);
 }
 }  // namespace bhpn_drake_interface
 }  // namespace examples
 }  // namespace drake
 
 int main(int argc, char* argv[]) {
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-  drake::logging::HandleSpdlogGflags();
+  //gflags::ParseCommandLineFlags(&argc, &argv, true);
+  //drake::logging::HandleSpdlogGflags();
   drake::examples::bhpn_drake_interface::main(argc, argv);
   return 0;
 }

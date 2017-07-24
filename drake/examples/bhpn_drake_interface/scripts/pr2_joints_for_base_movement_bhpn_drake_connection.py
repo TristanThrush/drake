@@ -127,15 +127,15 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         
         # Constants
         step_time = 50000
-        dx = 0.08
-        dy = 0.07
+        dx = 0.07
+        dy = 0.05
         dz = 0.0
         width_open = 0.07
         min_width_closed = 0.035
 
         # Move gripper around object.
         start_conf_open = start_conf.set(start_conf.robot.gripperChainNames[hand], [width_open])
-        target_conf_open = target_conf.set(target_conf.robot.gripperChainNames[hand], [width_open])
+        target_conf_open= target_conf.set(target_conf.robot.gripperChainNames[hand], [width_open])
         path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_open, target_conf_open], 0.01)
         n_conf = displaceHand(target_conf_open, hand, dx, dy, dz, nearTo=target_conf_open)
         path += rrt.interpolatePath([target_conf_open, n_conf], 0.01)
@@ -146,19 +146,12 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         start_time = time.time()
         while not bhpn_drake_interface_obj.is_gripped(hand, obj):
             n_conf = n_conf.set(n_conf.robot.gripperChainNames[hand], [max([min_width_closed, n_conf[n_conf.robot.gripperChainNames[hand]][0] - 0.015])])
-            path = [n_conf, n_conf, n_conf, n_conf]
+            path = [n_conf]*6
             plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
             bhpn_drake_interface_obj.command_drake_robot_plan(plan)
             if time.time() - start_time > timeout:
                 return False
         
-        # TODO: you wouldnt have to do this if you get the force sensitive gripping working.
-        '''
-        n_conf = n_conf.set(n_conf.robot.gripperChainNames[hand], [max([min_width_closed, n_conf[n_conf.robot.gripperChainNames[hand]][0] - 0.03])])
-        path = [n_conf, n_conf]
-        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step for step in range(len(path))])
-        bhpn_drake_interface_obj.command_drake_robot_plan(plan)
-        '''
         # Return to where the gripper started, holding the object.
         start_conf_closed = start_conf.set(start_conf.robot.gripperChainNames[hand], n_conf[n_conf.robot.gripperChainNames[hand]])
         path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_closed], 0.01)
@@ -166,6 +159,29 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
         
         return bhpn_drake_interface_obj.is_gripped(hand, obj)
+
+    def place(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj, timeout=60):
+        # Basic placing procedure. Not really that reactive (except it does ensure that the object is not gripped). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
+        
+        # Constants
+        step_time = 50000
+        width_open = 0.07
+     
+        # Move gripper to target conf and open it
+        hand_closed_conf = bhpn_drake_interface_obj.get_bhpn_robot_conf()[bhpn_drake_interface_obj.get_bhpn_robot_conf().robot.gripperChainNames[hand]]
+        start_conf_correct_hand_conf = start_conf.set(start_conf.robot.gripperChainNames[hand], hand_closed_conf)
+        target_conf_correct_hand_conf = target_conf.set(target_conf.robot.gripperChainNames[hand], hand_closed_conf)
+        path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_correct_hand_conf, target_conf_correct_hand_conf], 0.01)
+        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
+
+        target_conf_open = target_conf.set(target_conf.robot.gripperChainNames[hand], [width_open])
+        path = [target_conf_open, target_conf_open]
+        plan += bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
+
+        bhpn_drake_interface_obj.command_drake_robot_plan(plan)
+        
+        return not bhpn_drake_interface_obj.is_gripped(hand, obj)
+
 
 #TODO: get rid of this! it uses non-drake invKin
 def displaceHand(conf, hand, dx=0.0, dy=0.0, dz=0.0,
