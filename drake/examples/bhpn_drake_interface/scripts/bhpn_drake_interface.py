@@ -7,7 +7,7 @@ from robot import conf
 import lcm
 from drake import lcmt_robot_state, lcmt_viewer_draw, lcmt_contact_results_for_viz
 from bot_core import robot_state_t
-from robotlocomotion import robot_plan_t
+from robotlocomotion import robot_plan_t, plan_status_t
 from operator import sub
 import time
 import atexit
@@ -18,10 +18,11 @@ import subprocess
 import signal
 from pr2_joints_for_base_movement_bhpn_drake_connection import Pr2JointsForBaseMovementBhpnDrakeConnection
 
+drake_path = '/Users/tristanthrush/research/mit/drake/'
 interface_path = 'drake/examples/bhpn_drake_interface/'
-interface_build_path = 'drake/bazel-bin/drake/examples/bhpn_drake_interface/'
-interface_path_absolute = '/Users/tristanthrush/research/mit/drake/drake/examples/bhpn_drake_interface/'
-interface_build_path_absolute = '/Users/tristanthrush/research/mit/drake/bazel-bin/drake/examples/bhpn_drake_interface/'
+interface_build_path = 'bazel-bin/drake/examples/bhpn_drake_interface/'
+interface_path_absolute = drake_path + interface_path
+interface_build_path_absolute = drake_path + interface_build_path
 
 supported_object_types = {'drake_table': interface_path + 'objects/drake_table.sdf', 'drake_soda': interface_path + 'objects/drake_soda.urdf'}
 supported_robot_types = {'pr2': Pr2JointsForBaseMovementBhpnDrakeConnection}
@@ -39,12 +40,12 @@ class BhpnDrakeInterface:
             ):
 
         # Make sure that the drake simulation can actually be created with the given arguments.
-        if not set(robot_type).issubset(set(supported_robot_types.keys())):
+        if not set([robot_type]).issubset(set(supported_robot_types.keys())):
             raise ValueError('This robot is unsupported by the BHPN-Drake Interface.')
         if not set(object_types.values()).issubset(set(supported_object_types.keys())):
             raise ValueError('Some of these objects are unsupported by the BHPN-Drake Interface.')
-        if bhpn_robot_conf.getBasePose() != [0., 0., 0.]:
-            raise ValueError('The BHPN-Drake Interface requires that the base of the robot be at 0, 0, 0.')
+        if bhpn_robot_conf.baseConf() != (0., 0., 0.):
+            raise ValueError('The BHPN-Drake Interface requires that the base of the robot start at 0, 0, 0.')
 
         # Store the arguments.
         self.robot_type = robot_type
@@ -55,42 +56,61 @@ class BhpnDrakeInterface:
         self.fixed_objects = fixed_objects.copy()
 
         # Create the robot connection (implementation of primitives, etc.) that is specific to the type of robot.
-        self.robot_connection = supported_robots[self.robot_type](bhpn_robot_conf)        
+        self.robot_connection = supported_robot_types[self.robot_type](bhpn_robot_conf)        
         
         # Information about the drake simulation that will be properly initialized before this class is initialized.
         self.drake_robot_conf = None
         self.contact_results = None
+        self.plan_status = None
+        self.generated_description_paths = []
 
         # Start the lcm subscribers that listen to the drake simulatiuon for information.
         self.lc = lcm.LCM()
         self.lc.subscribe('ROBOT_STATE', self.robot_conf_callback)
         self.lc.subscribe('DRAKE_VIEWER_DRAW', self.object_pose_callback)
         self.lc.subscribe('CONTACT_RESULTS', self.contact_results_callback)
+        self.lc.subscribe('PLAN_STATUS', self.plan_status_callback)
         self.handler_poison_pill = False
-        self.robot_conf_handler = threading.Thread(target=self.handle_lcm_subscribers)
-        self.robot_conf_handler.daemon = True
-        self.robot_conf_handler.start()
+        self.callback_handler = threading.Thread(target=self.handle_lcm_subscribers)
+        self.callback_handler.daemon = True
+        self.callback_handler.start()
         
         # Start the drake simulation.
         self.drake_simulation = subprocess.Popen('cd ' + interface_build_path_absolute + '; ' + 'exec ' + self.create_drake_simulation_command(), shell=True)
         
         # Wait to get full information from drake simulation.
-        while self.drake_robot_conf is None or self.contact_results is None:
+        while self.drake_robot_conf is None or self.contact_results is None or self.plan_status is None:
             time.sleep(0.1)
 
         atexit.register(self.release)
+        print 'gripped: ', self.is_gripped('right', 'drake_soda')
         print 'Initialized the BHPN-Drake Interface.'
 
     ############# Initialization/Destruction methods ##########################
 
     def release(self):
         print 'Attempting to terminate the BHPN-Drake Interface.'
+        for path in self.generated_description_paths:
+            os.system('rm ' + path)
         self.handler_poison_pill = True
-        self.robot_conf_handler.join()
+        self.callback_handler.join()
         self.drake_simulation.terminate()
         return_code = self.drake_simulation.wait()
         print 'Return code of the Drake simulation: ', return_code
         print 'Terminated the BHPN-Drake Interface.'
+
+    def generate_description_for_object_name(self, object_name, object_type):
+        type_description_path = drake_path + supported_object_types[object_type]
+        type_description = open(type_description_path, 'r')
+        text = type_description.read()
+        type_description.close()
+        text = text.replace(object_type, object_name)
+        name_description_path = type_description_path.replace(object_type, object_name)
+        name_description = open(name_description_path, 'w')
+        name_description.write(text)
+        name_description.close()
+        self.generated_description_paths.append(name_description_path)
+        return supported_object_types[object_type].replace(object_type, object_name)
 
     def create_drake_simulation_command(self):
         command = interface_build_path_absolute + 'simulation '
@@ -101,12 +121,15 @@ class BhpnDrakeInterface:
         command += self.robot_connection.get_urdf_path() + ' '
         command += '0 0 0 0 0 0 '
         command += str(self.fixed_robot).lower() + ' '
-        for name, object_type in self.object_types.items():
-            command += name + ' '
-            command += supported_object_types[object_type] + ' '
-            for value in self.convert_to_drake_pose(self.bhpn_object_confs[name][name][0]):
+        for object_name, object_type in self.object_types.items():
+            command += object_name + ' '
+            if object_name != object_type:
+                command += self.generate_description_for_object_name(object_name, object_type) + ' '
+            else:
+                command += supported_object_types[object_type] + ' '
+            for value in self.convert_to_drake_pose(self.bhpn_object_confs[object_name][object_name][0]):
                     command += str(value) + ' '
-            if name in self.fixed_objects:
+            if object_name in self.fixed_objects:
                 command += 'true '
             else:
                 command += 'false '
@@ -120,7 +143,7 @@ class BhpnDrakeInterface:
         assert len(time) == len(bhpn_robot_path)
         plan = robot_plan_t()
         plan.utime = 0
-        plan.robot_type = self.robot_type 
+        plan.robot_name = self.robot_type 
         plan.num_states = len(time)
         plan.plan_info = [1]*plan.num_states 
         last_joint_values_on_path = self.drake_robot_conf.joint_position 
@@ -151,24 +174,24 @@ class BhpnDrakeInterface:
 
     def command_drake_robot_plan(self, plan):
         print "Attempting to follow Drake robot plan."
-        self.lc.publish('ROBOT_PLAN', plan.encode())
-        # TODO: think about the best way to consider this plan finished instead of the below while loop.
-        while np.max(np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drake_robot_conf.joint_position)) - self.robot_connection.get_move_threshold()) > 0:
-            
-            # If an object is gripped relax threshold for the gripper.
-            gripped = self.robot_connection.get_gripped_objects(self.contact_results, self.get_bhpn_object_confs().keys())
-            for hand, endEffector in self.robot_connection.get_hands_to_end_effectors().items():
-                print gripped[endEffector]
-                if gripped[endEffector] != []:
-                    for index in self.robot_connection.get_drake_hand_joint_indices()[hand]:
-                        self.robot_connection.set_ignored_move_threshold(index, True)
-                else:
-                    for index in self.robot_connection.get_drake_hand_joint_indices()[hand]:
-                        self.robot_connection.set_ignored_move_threshold(index, False)
-            
-            print np.abs(np.array(plan.plan[-1].joint_position) - np.array(self.drake_robot_conf.joint_position)) - self.robot_connection.get_move_threshold()
 
+        last_plan_start_utime = self.plan_status.last_plan_start_utime
+        print last_plan_start_utime
+        self.lc.publish('ROBOT_PLAN', plan.encode())
+
+        # Wait for plan to be recieved.
+        print "Waiting for plan to be recieved."
+        while self.plan_status.last_plan_start_utime == last_plan_start_utime:
             time.sleep(0.1)
+        print self.plan_status.last_plan_start_utime
+        print "Plan recieved."
+        
+        print "Waiting for plan to finish."
+        # Wait for plan to finish.
+        while self.plan_status.execution_status == 0:
+            time.sleep(0.1)
+        print "Plan finished."
+    
         print "Done following Drake robot plan."
 
     ######### Getter methods ##################################################
@@ -179,8 +202,8 @@ class BhpnDrakeInterface:
     def get_bhpn_object_confs(self):
         return self.bhpn_object_confs.copy()
 
-    def is_gripped(self, hand, obj):
-        return obj in self.robot_connection.get_gripped_objects(self.contact_results, [obj])[self.robot_connection.get_hands_to_end_effectors()[hand]]
+    def is_gripped(self, hand, object_name):
+        return object_name in self.robot_connection.get_gripped_objects([(object_name, self.object_types[object_name])], self)[object_name][self.robot_connection.get_hands_to_end_effectors()[hand]]
 
     # BHPN Primitives that are robot-secific, and supported in the interface ##
 
@@ -204,12 +227,14 @@ class BhpnDrakeInterface:
     def object_pose_callback(self, channel, data):
         msg = lcmt_viewer_draw.decode(data)
         for obj in self.bhpn_object_confs:
-            objPose = self.convert_to_bhpn_pose(msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
-            self.bhpn_object_confs[obj] = objPose     
-
+             self.bhpn_object_confs[obj] = self.convert_to_bhpn_pose(msg.position[msg.link_name.index(obj)], msg.quaternion[msg.link_name.index(obj)])
+                
     def contact_results_callback(self, channel, data):
-        self.contact_results = lcmt_contact_results_for_viz.decode(data)            
-        
+        self.contact_results = lcmt_contact_results_for_viz.decode(data)
+    
+    def plan_status_callback(self, channel, data):
+        self.plan_status = plan_status_t.decode(data)
+             
     ######### Conversion utility methods ######################################
 
     def convert_to_bhpn_pose(self, position, orientation):

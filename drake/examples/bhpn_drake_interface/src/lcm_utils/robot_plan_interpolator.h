@@ -46,6 +46,10 @@ class RobotPlanInterpolator : public systems::LeafSystem<double> {
   const systems::OutputPort<double>& get_acceleration_output_port() const {
     return this->get_output_port(acceleration_output_port_);
   }
+	
+  const systems::OutputPort<double>& get_status_output_port() const {
+    return this->get_output_port(status_output_port_);
+  }
 
   /**
    * Makes a plan to hold at the measured joint configuration @p q0 starting at
@@ -80,6 +84,11 @@ class RobotPlanInterpolator : public systems::LeafSystem<double> {
   void OutputAccel(const systems::Context<double>& context,
                    systems::BasicVector<double>* output) const;
 
+  // Calculator method for the time remaining output port.
+  void OutputStatus(const systems::Context<double>& context,
+                   systems::BasicVector<double>* output) const;
+
+
   void MakeFixedPlan(double plan_start_time, const VectorX<double>& q0,
                      systems::State<double>* state) const;
 
@@ -88,6 +97,7 @@ class RobotPlanInterpolator : public systems::LeafSystem<double> {
   int state_input_port_{-1};
   int state_output_port_{-1};
   int acceleration_output_port_{-1};
+  int status_output_port_{-1};
   RigidBodyTree<double> tree_;
 };
 

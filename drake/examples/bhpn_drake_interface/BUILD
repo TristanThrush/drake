@@ -37,6 +37,18 @@ drake_cc_library(
 )
 
 drake_cc_library(
+    name = "plan_status_lcm",
+    srcs = ["src/lcm_utils/plan_status_lcm.cc"],
+    hdrs = ["src/lcm_utils/plan_status_lcm.h"],
+    deps = [
+        "@lcmtypes_robotlocomotion",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/systems/framework:leaf_system",
+    ],
+)
+
+
+drake_cc_library(
     name = "sim_diagram_builder",
     srcs = ["src/simulation_utils/sim_diagram_builder.cc"],
     hdrs = ["src/simulation_utils/sim_diagram_builder.h"],
@@ -114,6 +126,7 @@ drake_cc_binary(
 	":robot_plan_interpolator",
         ":sim_diagram_builder",
         ":world_sim_tree_builder",
+        ":plan_status_lcm",
         "//drake/lcm",
 	"//drake/util:lcm_util",
         "//drake/multibody/rigid_body_plant",

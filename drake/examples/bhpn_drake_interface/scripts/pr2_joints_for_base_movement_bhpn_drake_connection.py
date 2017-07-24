@@ -17,7 +17,7 @@ import pydrake
 import numpy as np
 import subprocess
 import signal
-#TODO: get rid of unused imports
+# TODO: get rid of unused imports
 from robot_bhpn_drake_connection import RobotBhpnDrakeConnection
 
 class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
@@ -92,33 +92,44 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
     def get_drake_continuous_joint_indices(self):
         return (2, 8, 10, 12, 17, 19, 21)
 
-    def get_gripped_objects(self, contact_results, objects_to_check):
-        #TODO: make this method force-sensitive.
+    def drake_soda_gripped_function(self, object_name, bhpn_drake_interface_obj):
+        contact_force_magnitude_threshold = 50.0
+        contact_results = bhpn_drake_interface_obj.contact_results
         gripper_end_effector_to_gripped_objects = {'l_gripper_palm_link':[], 'r_gripper_palm_link':[]}
         necessary_collisions_for_l_gripper_grip = set(['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link'])
-        necessary_collisions_for_r_gripper_grip = set(['r_gripper_l_finger_tip_link', 'r_gripper_r_finger_tip_link'])
+        necessary_collisions_for_r_gripper_grip = set(['r_gripper_l_finger_tip_link']) # TODO: ask why I have to do this , 'r_gripper_r_finger_tip_link'])
         necessary_collisions_combined = set()
         necessary_collisions_combined.update(necessary_collisions_for_l_gripper_grip)
         necessary_collisions_combined.update(necessary_collisions_for_r_gripper_grip)
-        for obj in objects_to_check:
-            obj_contacts_list = map(lambda contact_info: contact_info.body2_name, filter(lambda contact_info: contact_info.body1_name == obj and (contact_info.body2_name in necessary_collisions_combined), contact_results.contact_info))
-            obj_contacts_list += map(lambda contact_info: contact_info.body1_name, filter(lambda contact_info: contact_info.body2_name == obj and (contact_info.body1_name in necessary_collisions_combined), contact_results.contact_info))
-            obj_contacts = set(obj_contacts_list)
-            if necessary_collisions_for_l_gripper_grip.issubset(obj_contacts):
-                gripper_end_effector_to_gripped_objects['l_gripper_palm_link'] += [obj]
-            if necessary_collisions_for_r_gripper_grip.issubset(obj_contacts):
-                gripper_end_effector_to_gripped_objects['r_gripper_palm_link'] += [obj]
-        
+        relevant_contact_results = filter(lambda contact_info: ((contact_info.body1_name == object_name and (contact_info.body2_name in necessary_collisions_combined)) or (contact_info.body2_name == object_name and (contact_info.body1_name in necessary_collisions_combined))) and np.linalg.norm(np.array(contact_info.contact_force)) >= contact_force_magnitude_threshold, contact_results.contact_info)
+        relevant_contact_results_names = map(lambda contact_info: contact_info.body1_name if contact_info.body2_name == object_name else contact_info.body2_name, relevant_contact_results)
+        relevant_names = set(relevant_contact_results_names)
+        if necessary_collisions_for_l_gripper_grip.issubset(relevant_names):
+            gripper_end_effector_to_gripped_objects['l_gripper_palm_link'] += [object_name]
+        if necessary_collisions_for_r_gripper_grip.issubset(relevant_names):
+            gripper_end_effector_to_gripped_objects['r_gripper_palm_link'] += [object_name]
         return gripper_end_effector_to_gripped_objects
+
+    def get_object_gripped_function(self, object_type):
+        if object_type == 'drake_soda':
+            return self.drake_soda_gripped_function
+        else:
+            raise ValueError('A method to tell if this object has been gripped has not been provided')
+    
+    def get_gripped_objects(self, objects_to_check, bhpn_drake_interface_obj):
+        gripped_results = {}
+        for object_name, object_type in objects_to_check:
+            gripped_results[object_name] = self.get_object_gripped_function(object_type)(object_name, bhpn_drake_interface_obj)
+        return gripped_results
 
     def pick(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj, timeout=60):
         # Basic picking procedure. Not really that reactive (except it does ensure that the object is gripped hard enough). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
         
         # Constants
-        step_time = 100000
+        step_time = 50000
         dx = 0.08
         dy = 0.07
-        dz = -0.1
+        dz = 0.0
         width_open = 0.07
         min_width_closed = 0.035
 
@@ -134,19 +145,20 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         # Move the fingers around the object and stop when we have gripped it hard enough or when the time to try is over ("hard enough" for this robot is defined by isGripped)
         start_time = time.time()
         while not bhpn_drake_interface_obj.is_gripped(hand, obj):
-            n_conf = n_conf.set(n_conf.robot.gripperChainNames[hand], [max([min_width_closed, n_conf[n_conf.robot.gripperChainNames[hand]][0] - 0.001])])
-            path = [n_conf, n_conf]
-            plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step for step in range(len(path))])
+            n_conf = n_conf.set(n_conf.robot.gripperChainNames[hand], [max([min_width_closed, n_conf[n_conf.robot.gripperChainNames[hand]][0] - 0.015])])
+            path = [n_conf, n_conf, n_conf, n_conf]
+            plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
             bhpn_drake_interface_obj.command_drake_robot_plan(plan)
             if time.time() - start_time > timeout:
                 return False
         
         # TODO: you wouldnt have to do this if you get the force sensitive gripping working.
+        '''
         n_conf = n_conf.set(n_conf.robot.gripperChainNames[hand], [max([min_width_closed, n_conf[n_conf.robot.gripperChainNames[hand]][0] - 0.03])])
         path = [n_conf, n_conf]
         plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step for step in range(len(path))])
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
-        
+        '''
         # Return to where the gripper started, holding the object.
         start_conf_closed = start_conf.set(start_conf.robot.gripperChainNames[hand], n_conf[n_conf.robot.gripperChainNames[hand]])
         path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_closed], 0.01)

@@ -4,6 +4,7 @@
 #include "drake/common/text_logging_gflags.h"
 #include "drake/examples/bhpn_drake_interface/src/controllers/pr2_fixed_controller.h"
 #include "drake/examples/bhpn_drake_interface/src/lcm_utils/robot_state_lcm.h"
+#include "drake/examples/bhpn_drake_interface/src/lcm_utils/plan_status_lcm.h"
 #include "drake/examples/bhpn_drake_interface/src/simulation_utils/sim_diagram_builder.h"
 #include "drake/examples/bhpn_drake_interface/src/simulation_utils/world_sim_tree_builder.h"
 #include "drake/lcm/drake_lcm.h"
@@ -104,9 +105,9 @@ void main(int argc, char* argv[]) {
   auto status_pub = diagram_builder->AddSystem(
       systems::lcm::LcmPublisherSystem::Make<lcmt_robot_state>("ROBOT_STATE",
                                                                &lcm));
-
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(lcmStatusPeriod);
+
   auto status_sender =
       diagram_builder->AddSystem<RobotStateSender>(num_actuators);
   status_sender->set_name("status_sender");
@@ -119,8 +120,22 @@ void main(int argc, char* argv[]) {
   auto command_injector = diagram_builder->AddSystem<RobotPlanInterpolator>(
       FindResourceOrThrow(urdf_paths[0]));
   command_injector->set_name("command_injector");
+  
+  auto plan_status_pub = diagram_builder->AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<robotlocomotion::plan_status_t>("PLAN_STATUS",
+                                                               &lcm));
+  plan_status_pub->set_name("plan_status_publisher");
+  plan_status_pub->set_publish_period(lcmStatusPeriod);
+
+  auto plan_status_sender = diagram_builder->AddSystem<PlanStatusSender>();
+  plan_status_sender->set_name("plan_status_sender");
+
   add_pr2_fixed_controller(diagram_builder, plant, world_info[0].instance_id,
                            plan_receiver, command_injector);
+
+  diagram_builder->Connect(command_injector->get_status_output_port(), plan_status_sender->get_input_port(0));
+  diagram_builder->Connect(plan_status_sender->get_output_port(0), plan_status_pub->get_input_port(0));
+
   diagram_builder->Connect(
       plant->model_instance_state_output_port(world_info[0].instance_id),
       status_sender->get_state_input_port());
@@ -145,15 +160,14 @@ void main(int argc, char* argv[]) {
   // Give the plant some contact parameters that encourage the gripping of
   // objects.
 
-  const double kStiffness = 4000;
+  const double kStiffness = 3000;
   const double kDissipation = 10.0;
 
-  // const double kStaticFriction = 0.9;
-  // const double kDynamicFriction = 0.3;
-  // const double kVStictionTolerance = 0.5;
+  const double kStaticFriction = 1.8;
+  const double kDynamicFriction = 1.0;
+  const double kVStictionTolerance = 1e-5;
   plant->set_normal_contact_parameters(kStiffness, kDissipation);
-  // plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
-  // kVStictionTolerance);
+  plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction, kVStictionTolerance);
 
   // Initialize the starting configuration of the joints, initialize the
   // command_injector, and start the simulation.
@@ -172,13 +186,13 @@ void main(int argc, char* argv[]) {
     plant->set_position(simulator.get_mutable_context(), index,
                         initial_joint_positions[index]);
   }
-  simulator.Initialize();
-  simulator.set_target_realtime_rate(1.0);
   auto& plan_source_context = diagram->GetMutableSubsystemContext(
       *command_injector, simulator.get_mutable_context());
   command_injector->Initialize(plan_source_context.get_time(),
                                initial_joint_positions,
                                plan_source_context.get_mutable_state());
+  simulator.Initialize();
+  simulator.set_target_realtime_rate(1.0);
   simulator.StepTo(500000000000);
 }
 }  // namespace bhpn_drake_interface

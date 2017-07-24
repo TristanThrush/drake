@@ -69,6 +69,10 @@ RobotPlanInterpolator::RobotPlanInterpolator(const std::string& model_path,
               systems::BasicVector<double>(tree_.get_num_velocities()),
               &RobotPlanInterpolator::OutputAccel)
           .get_index();
+  status_output_port_ =
+      this->DeclareVectorOutputPort(systems::BasicVector<double>(6),
+                                    &RobotPlanInterpolator::OutputStatus)
+          .get_index();
 
   this->DeclarePeriodicUnrestrictedUpdate(update_interval, 0);
 }
@@ -129,6 +133,28 @@ void RobotPlanInterpolator::OutputAccel(
   if (current_plan_time > plan.pp_double_deriv.getEndTime()) {
     output_acceleration_vec.fill(0);
   }
+}
+
+void RobotPlanInterpolator::OutputStatus(
+    const systems::Context<double>& context, 
+    systems::BasicVector<double>* output) const {
+  const PlanData& plan = context.get_abstract_state<PlanData>(kAbsStateIdxPlan);
+  const bool inited = context.get_abstract_state<bool>(kAbsStateIdxInitFlag);
+  DRAKE_DEMAND(inited);
+  
+  Eigen::VectorBlock<VectorX<double>> output_status_vec =
+      output->get_mutable_value();
+
+  const double current_plan_time = context.get_time() - plan.start_time;
+  const double execution_status = current_plan_time >  plan.pp.getEndTime() ? 1.0 : 0.0;
+  const double last_plan_msg_utime = 0;
+  const double last_plan_start_utime = plan.start_time;
+  const double plan_type = 0;
+  const double recovery_enabled = 0;
+  const double bracing_enabled = 0;
+  VectorX<double> current_status_vec(6);
+  current_status_vec << execution_status, last_plan_msg_utime, last_plan_start_utime, plan_type, recovery_enabled, bracing_enabled;
+  output_status_vec = current_status_vec;  
 }
 
 void RobotPlanInterpolator::MakeFixedPlan(double plan_start_time,
