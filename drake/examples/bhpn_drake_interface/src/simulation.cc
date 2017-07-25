@@ -187,11 +187,11 @@ void main(int argc, char* argv[]) {
                                initial_joint_positions,
                                plan_source_context.get_mutable_state());
 
-  const double dt = 1e-3;
-  //simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(*diagram,
+  //const double dt = 1e-3;
+  //simulator.reset_integrator<systems::RungeKutta3Integrator<double>>(*diagram,
   //simulator.get_mutable_context());
-  simulator.get_mutable_integrator()->set_maximum_step_size(dt);
-  //simulator.get_mutable_integrator()->set_target_accuracy(5e-1);
+  //simulator.get_mutable_integrator()->set_maximum_step_size(dt);
+  //simulator.get_mutable_integrator()->set_target_accuracy(1e-2);
 
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
