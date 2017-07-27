@@ -10,6 +10,8 @@ load(
 )
 load("//tools:gurobi.bzl", "gurobi_test_tags")
 
+package(default_visibility = ["//visibility:public"])
+
 drake_cc_library(
     name = "humanoid_status_translator_system",
     srcs = ["humanoid_status_translator_system.cc"],
@@ -63,6 +65,7 @@ drake_cc_library(
     hdrs = ["humanoid_plan_eval_system.h"],
     deps = [
         ":plan_eval_base_system",
+        "//drake/examples/QPInverseDynamicsForHumanoids/plan_eval:humanoid_manipulation_plan",
     ],
 )
 

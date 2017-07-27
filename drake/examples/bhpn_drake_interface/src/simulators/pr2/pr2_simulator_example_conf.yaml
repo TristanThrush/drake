@@ -1,0 +1,20 @@
+simulator_type: "pr2_simulator"
+robot_state_t_topic: "ROBOT_STATE"
+robot_plan_t_topic: "ROBOT_PLAN"
+plan_status_t_topic: "PLAN_STATUS"
+contact_results_for_viz_topic: "CONTACT_RESULTS"
+initial_joint_positions: [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.5, 0.5, 0., 0., 0., 0., 0., 0., 0., 0.5, 0.5]          
+objects:
+        drake_table:
+                name: "drake_table"
+                description_path: "drake/examples/bhpn_drake_interface/objects/drake_table.sdf"
+                initial_pose: [2., 0., 0.38225, 0., 0., 0.]
+                fixed: False
+        drake_soda:
+                name: "drake_soda"
+                description_path: "drake/examples/bhpn_drake_interface/objects/drake_table.sdf"
+                initial_pose: [2., 0., 0.8425, 0., 0., 0.]
+                fixed: False
+
+      
+  

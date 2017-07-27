@@ -18,10 +18,11 @@
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
+#include "robotlocomotion/robot_plan_t.hpp"
 
 namespace drake {
 namespace examples {
-namespace qp_inverse_dynamics {
+namespace bhpn_drake_interface {
 
 /**
  * A controller for humanoid balancing built on top of HumanoidPlanEvalSystem
@@ -30,22 +31,21 @@ namespace qp_inverse_dynamics {
  */
 class ValkyrieController : public systems::Diagram<double> {
  public:
-  ValkyrieController(const std::string& model_path,
-                     const std::string& control_config_path,
-                     const std::string& alias_group_path, lcm::DrakeLcm* lcm) {
+  ValkyrieController(lcm::DrakeLcm* lcm) {
+
     systems::DiagramBuilder<double> builder;
 
     robot_ = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
-        model_path, multibody::joints::kRollPitchYaw, robot_.get());
+        valkyrie_model_path, multibody::joints::kRollPitchYaw, robot_.get());
     RobotStateMsgToHumanoidStatusSystem* msg_to_humanoid_status =
         builder.AddSystem(std::make_unique<RobotStateMsgToHumanoidStatusSystem>(
-            *robot_, alias_group_path));
+            *robot_, valkyrie_alias_group_path));
     msg_to_humanoid_status->set_name("msg_to_humanoid_status");
 
     const double kControlDt = 0.003;
     plan_eval_ = builder.AddSystem(std::make_unique<HumanoidPlanEvalSystem>(
-        *robot_, alias_group_path, control_config_path, kControlDt));
+        *robot_, valkyrie_alias_group_path, valkyrie_control_config_path, kControlDt));
     plan_eval_->set_name("plan_eval");
 
     QpControllerSystem* qp_con = builder.AddSystem(
@@ -61,6 +61,11 @@ class ValkyrieController : public systems::Diagram<double> {
             "EST_ROBOT_STATE", lcm));
     robot_state_subscriber_->set_name("robot_state_subscriber");
 
+    auto plan_subscriber = builder.AddSystem(
+        systems::lcm::LcmSubscriberSystem::Make<robotlocomotion::robot_plan_t>(
+            "VALKYRIE_MANIP_PLAN", lcm));
+    plan_subscriber->set_name("plan_subscriber");
+
     auto atlas_command_publisher = builder.AddSystem(
         systems::lcm::LcmPublisherSystem::Make<bot_core::atlas_command_t>(
             "ROBOT_COMMAND", lcm));
@@ -69,9 +74,11 @@ class ValkyrieController : public systems::Diagram<double> {
     // lcm -> rs
     builder.Connect(robot_state_subscriber_->get_output_port(0),
                     msg_to_humanoid_status->get_input_port_robot_state_msg());
-    // rs -> qp_input
+    // rs + plan -> qp_input
     builder.Connect(msg_to_humanoid_status->get_output_port_humanoid_status(),
                     plan_eval_->get_input_port_humanoid_status());
+    builder.Connect(plan_subscriber->get_output_port(0),
+                    plan_eval_->get_input_port_plan_msg());
     // rs + qp_input -> qp_output
     builder.Connect(msg_to_humanoid_status->get_output_port_humanoid_status(),
                     qp_con->get_input_port_humanoid_status());
@@ -105,6 +112,6 @@ class ValkyrieController : public systems::Diagram<double> {
   std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
 };
 
-}  // end namespace qp_inverse_dynamics
+}  // end namespace bhpn_drake_interface
 }  // end namespace examples
 }  // end namespace drake

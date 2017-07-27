@@ -10,7 +10,7 @@ load(
 )
 
 package(
-    default_visibility = [":__subpackages__"],
+    default_visibility = ["//visibility:public"],
 )
 
 filegroup(
