@@ -1,18 +1,18 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/humanoid_plan_eval_system.h"
 
 #include <gtest/gtest.h>
+#include "robotlocomotion/robot_plan_t.hpp"
 
 #include "drake/common/eigen_matrix_compare.h"
 #include "drake/common/find_resource.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/qp_controller_system.h"
-#include "drake/examples/Valkyrie/valkyrie_constants.h"
+#include "drake/examples/valkyrie/valkyrie_constants.h"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/primitives/constant_value_source.h"
-#include "robotlocomotion/robot_plan_t.hpp"
 
 namespace drake {
 namespace examples {
@@ -33,7 +33,7 @@ class HumanoidPlanEvalAndQpInverseDynamicsTest : public ::testing::Test {
  protected:
   void SetUp() override {
     const std::string kModelPath = FindResourceOrThrow(
-        "drake/examples/Valkyrie/urdf/urdf/"
+        "drake/examples/valkyrie/urdf/urdf/"
         "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf");
 
     const std::string kAliasGroupsPath = FindResourceOrThrow(
@@ -83,7 +83,7 @@ class HumanoidPlanEvalAndQpInverseDynamicsTest : public ::testing::Test {
                     plan_eval->get_input_port_humanoid_status());
     // Plan source -> plan eval.
     builder.Connect(plan_source->get_output_port(0),
-                    plan_eval->get_input_port_plan_msg());
+                    plan_eval->get_input_port_manip_plan_msg());
     // plan eval -> qp inverse dynamics.
     builder.Connect(plan_eval->get_output_port_qp_input(),
                     controller->get_input_port_qp_input());

@@ -7,6 +7,7 @@
 
 namespace drake {
 namespace systems {
+namespace controllers {
 
 /**
  * Given a desired two dimensional (X and Y) zero-moment point (ZMP) trajectory
@@ -282,7 +283,7 @@ class ZMPPlanner {
   // Used to test whether the last point of the desired ZMP trajectory is
   // stationary or not in CheckStationaryEndPoint. This number is currently
   // arbitrarily chosen.
-  double kStationaryThreshold = 1e-8;
+  static constexpr double kStationaryThreshold = 1e-8;
 
   // Symbols:
   // x: [com; comd]
@@ -328,5 +329,6 @@ class ZMPPlanner {
   bool planned_ {false};
 };
 
+}  // namespace controllers
 }  // namespace systems
 }  // namespace drake

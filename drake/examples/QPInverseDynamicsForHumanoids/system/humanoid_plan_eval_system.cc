@@ -5,8 +5,9 @@
 #include <utility>
 #include <vector>
 
-#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/dev/humanoid_manipulation_plan.h"
 #include "robotlocomotion/robot_plan_t.hpp"
+
+#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/dev/humanoid_manipulation_plan.h"
 
 namespace drake {
 namespace examples {
@@ -19,7 +20,7 @@ HumanoidPlanEvalSystem::HumanoidPlanEvalSystem(
     : PlanEvalBaseSystem(robot, alias_groups_file_name, param_file_name, dt) {
   set_name("HumanoidPlanEval");
 
-  input_port_index_plan_msg_ = DeclareAbstractInputPort().get_index();
+  input_port_index_manip_plan_msg_ = DeclareAbstractInputPort().get_index();
 
   auto plan_as_value = systems::AbstractValue::Make<GenericPlan<double>>(
       HumanoidManipulationPlan<double>());
@@ -38,16 +39,13 @@ void HumanoidPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
       context, get_input_port_humanoid_status().get_index());
 
   // Gets the plan message fron input.
-  const robotlocomotion::robot_plan_t* msg =
-      EvalInputValue<robotlocomotion::robot_plan_t>(
-          context, input_port_index_plan_msg_);
+  const systems::AbstractValue* msg_as_value =
+      EvalAbstractInput(context, input_port_index_manip_plan_msg_);
+  DRAKE_DEMAND(msg_as_value != nullptr);
 
   // Handles the plan.
-  std::vector<uint8_t> raw_msg_bytes;
-  raw_msg_bytes.resize(msg->getEncodedSize());
-  msg->encode(raw_msg_bytes.data(), 0, raw_msg_bytes.size());
-  plan.HandlePlanMessage(*robot_status, get_paramset(),
-      get_alias_groups(), raw_msg_bytes.data(), raw_msg_bytes.size());
+  plan.HandlePlan(*robot_status, get_paramset(), get_alias_groups(),
+                  *msg_as_value);
 
   // Runs the controller.
   plan.ModifyPlan(*robot_status, get_paramset(), get_alias_groups());
@@ -66,7 +64,8 @@ void HumanoidPlanEvalSystem::Initialize(const HumanoidStatus& current_status,
   plan.Initialize(current_status, get_paramset(), get_alias_groups());
 
   // Uses the plan to initialize the first QpInput. This is important because
-  // on the first tick, CalcOutput will be called before unrestricted update.
+  // on the first tick, CalcOutput will be called before unrestricted update,
+  // where outputs are "really" computed. So we need to compute it here first.
   QpInput& qp_input = get_mutable_qp_input(state);
   plan.UpdateQpInput(current_status, get_paramset(), get_alias_groups(),
                      &qp_input);
