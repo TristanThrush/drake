@@ -70,7 +70,7 @@ void main(int argc, char* argv[]) {
   std::vector<std::string> names = conf.object_names;
   names.insert(names.begin(), "pr2");
   std::vector<std::string> description_paths = conf.object_description_paths;
-  description_paths.insert(description_paths.begin(), "drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf");
+  description_paths.insert(description_paths.begin(), "drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf");
   std::vector<Eigen::Vector3d> initial_poses_xyz = conf.initial_object_poses_xyz;
   initial_poses_xyz.insert(initial_poses_xyz.begin(), conf.initial_robot_pose_xyz);
   std::vector<Eigen::Vector3d> initial_poses_rpy = conf.initial_object_poses_rpy;
@@ -98,7 +98,7 @@ void main(int argc, char* argv[]) {
   plan_receiver->set_name("plan_receiver");
 
   auto command_injector = diagram_builder.AddSystem<RobotPlanInterpolator>(
-      "drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf");
+      drake::FindResourceOrThrow("drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf"));
   command_injector->set_name("command_injector");
   
   auto plan_status_pub = diagram_builder.AddSystem(

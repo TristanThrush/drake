@@ -78,7 +78,7 @@ class BhpnDrakeInterface:
         
         # Start the drake simulation.
         self.create_bdisc()
-        self.drake_simulation = subprocess.Popen('cd ' + interface_build_path_absolute + '; exec ' + self.robot_simulator_executable + ' ' + interface_path_absolute + 'tmp/simulation_conf.bdisc', shell=True)
+        self.drake_simulation = subprocess.Popen('cd ' + interface_build_path_absolute + '; exec ' + interface_build_path_absolute + self.robot_simulator_executable + ' ' + interface_path_absolute + 'tmp/simulator_conf.bdisc', shell=True)
         
         # Wait to get full information from drake simulation.
         while self.drake_robot_conf is None or self.contact_results is None or self.plan_status is None:
@@ -94,7 +94,7 @@ class BhpnDrakeInterface:
         print 'Attempting to terminate the BHPN-Drake Interface.'
         for path in self.generated_description_paths:
             os.system('rm ' + path)
-        os.system('rm ' + interface_path_absolute + 'tmp/simulation_conf.bdisc')
+        os.system('rm ' + interface_path_absolute + 'tmp/simulator_conf.bdisc')
         self.handler_poison_pill = True
         self.callback_handler.join()
         self.drake_simulation.terminate()
@@ -123,7 +123,7 @@ class BhpnDrakeInterface:
             initial_robot_joint_positions += str(joint) + ' '
         objects = []
         for object_name, object_type in self.object_types.items():
-            objecf_info = ''
+            object_info = ''
             object_info += object_name + ' '
             if object_name != object_type:
                 object_info += self.generate_description_for_object_name(object_name, object_type) + ' '
@@ -136,19 +136,19 @@ class BhpnDrakeInterface:
             else:
                 object_info += 'false '
             objects.append(object_info)
-        simulation_conf_text = initial_robot_pose + '\n'
-        siumulation_conf_text += initial_robot_joint_positions + '\n'
+        simulator_conf_text = initial_robot_pose + '\n'
+        simulator_conf_text += initial_robot_joint_positions + '\n'
         num_objects = len(objects)
         for index in range(num_objects):
             if index != num_objects - 1:
-                simulation_conf_text += object_info + '\n'
+                simulator_conf_text += objects[index] + '\n'
             else:
-                simulation_conf_text += object_info
-        simulation_conf_file = open(interface_path_absolute + 'tmp/simulation_conf.bdisc', 'w')
-        simulation_conf_file.write(simulation_conf_text)
-        simulation_conf_file.close()
-        print 'Created simulation_conf_file:'
-        print simulation_conf_text
+                simulator_conf_text += objects[index]
+        simulator_conf_file = open(interface_path_absolute + 'tmp/simulator_conf.bdisc', 'w')
+        simulator_conf_file.write(simulator_conf_text)
+        simulator_conf_file.close()
+        print 'Created simulator_conf_file:'
+        print simulator_conf_text
 
     ######### Simulation command methods ######################################
 

@@ -3,6 +3,7 @@
 *.mex*
 *.exp
 *.pdb
+*.pyc
 *.lib
 *.ilk
 *.o
@@ -62,3 +63,4 @@ xcode
 .cproject
 .project
 .settings
+.DS_Store
