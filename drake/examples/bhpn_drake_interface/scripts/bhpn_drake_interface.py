@@ -25,7 +25,7 @@ interface_path_absolute = drake_path + interface_path
 interface_build_path_absolute = drake_path + interface_build_path
 
 supported_object_types = {'drake_table': interface_path + 'objects/drake_table.sdf', 'drake_soda': interface_path + 'objects/drake_soda.urdf'}
-supported_robot_types = {'pr2': Pr2JointsForBaseMovementBhpnDrakeConnection}
+supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator')}
 
 class BhpnDrakeInterface:
 
@@ -55,8 +55,9 @@ class BhpnDrakeInterface:
         self.bhpn_object_confs = bhpn_object_confs.copy()
         self.fixed_objects = fixed_objects.copy()
 
-        # Create the robot connection (implementation of primitives, etc.) that is specific to the type of robot.
-        self.robot_connection = supported_robot_types[self.robot_type](bhpn_robot_conf)        
+        # Create the robot connection and get the simulator that is specific to the type of robot.
+        self.robot_connection = supported_robot_types[self.robot_type][0](bhpn_robot_conf)       
+        self.robot_simulator_executable = supported_robot_types[self.robot_type][1]
         
         # Information about the drake simulation that will be properly initialized before this class is initialized.
         self.drake_robot_conf = None
@@ -76,7 +77,8 @@ class BhpnDrakeInterface:
         self.callback_handler.start()
         
         # Start the drake simulation.
-        self.drake_simulation = subprocess.Popen('cd ' + interface_build_path_absolute + '; ' + 'exec ' + self.create_drake_simulation_command(), shell=True)
+        self.create_bdisc()
+        self.drake_simulation = subprocess.Popen('cd ' + interface_build_path_absolute + '; exec ' + self.robot_simulator_executable + ' ' + interface_path_absolute + 'tmp/simulation_conf.bdisc', shell=True)
         
         # Wait to get full information from drake simulation.
         while self.drake_robot_conf is None or self.contact_results is None or self.plan_status is None:
@@ -92,6 +94,7 @@ class BhpnDrakeInterface:
         print 'Attempting to terminate the BHPN-Drake Interface.'
         for path in self.generated_description_paths:
             os.system('rm ' + path)
+        os.system('rm ' + interface_path_absolute + 'tmp/simulation_conf.bdisc')
         self.handler_poison_pill = True
         self.callback_handler.join()
         self.drake_simulation.terminate()
@@ -105,37 +108,47 @@ class BhpnDrakeInterface:
         text = type_description.read()
         type_description.close()
         text = text.replace(object_type, object_name)
-        name_description_path = type_description_path.replace(object_type, object_name)
+        # I know that the following is not robost to every path name, but I think it will be fine (hopefully)
+        name_description_path = type_description_path.split(object_type).replace(object_type, object_name).replace('objects', 'tmp') 
         name_description = open(name_description_path, 'w')
         name_description.write(text)
         name_description.close()
         self.generated_description_paths.append(name_description_path)
         return supported_object_types[object_type].replace(object_type, object_name)
 
-    def create_drake_simulation_command(self):
-        command = interface_build_path_absolute + 'simulation '
-        command += str(self.robot_connection.get_num_joints()) + ' '
+    def create_bdisc(self):
+        initial_robot_pose = '0 0 0 0 0 0'
+        initial_robot_joint_positions = ''
         for joint in self.robot_connection.get_drake_robot_conf(self.bhpn_robot_conf).joint_position:
-            command += str(joint) + ' '
-        command += self.robot_type + ' '
-        command += self.robot_connection.get_urdf_path() + ' '
-        command += '0 0 0 0 0 0 '
-        command += str(self.fixed_robot).lower() + ' '
+            initial_robot_joint_positions += str(joint) + ' '
+        objects = []
         for object_name, object_type in self.object_types.items():
-            command += object_name + ' '
+            objecf_info = ''
+            object_info += object_name + ' '
             if object_name != object_type:
-                command += self.generate_description_for_object_name(object_name, object_type) + ' '
+                object_info += self.generate_description_for_object_name(object_name, object_type) + ' '
             else:
-                command += supported_object_types[object_type] + ' '
+                object_info += supported_object_types[object_type] + ' '
             for value in self.convert_to_drake_pose(self.bhpn_object_confs[object_name][object_name][0]):
-                    command += str(value) + ' '
+                object_info += str(value) + ' '
             if object_name in self.fixed_objects:
-                command += 'true '
+                object_info += 'true '
             else:
-                command += 'false '
-        print 'Created Drake simulation command.'
-        print command
-        return command
+                object_info += 'false '
+            objects.append(object_info)
+        simulation_conf_text = initial_robot_pose + '\n'
+        siumulation_conf_text += initial_robot_joint_positions + '\n'
+        num_objects = len(objects)
+        for index in range(num_objects):
+            if index != num_objects - 1:
+                simulation_conf_text += object_info + '\n'
+            else:
+                simulation_conf_text += object_info
+        simulation_conf_file = open(interface_path_absolute + 'tmp/simulation_conf.bdisc', 'w')
+        simulation_conf_file.write(simulation_conf_text)
+        simulation_conf_file.close()
+        print 'Created simulation_conf_file:'
+        print simulation_conf_text
 
     ######### Simulation command methods ######################################
 

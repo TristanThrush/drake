@@ -1,4 +1,6 @@
 #include <gflags/gflags.h>
+#include <fstream>
+#include <typeinfo>
 #include "gperftools/profiler.h"
 #include "robotlocomotion/robot_plan_t.hpp"
 #include "drake/common/find_resource.h"
@@ -6,7 +8,7 @@
 #include "drake/examples/bhpn_drake_interface/src/utils/robot_state_lcm.h"
 #include "drake/examples/bhpn_drake_interface/src/utils/plan_status_lcm.h"
 #include "drake/examples/bhpn_drake_interface/src/utils/world_sim_tree_builder.h"
-#include "drake/examples/bhpn_drake_interface/src/simulators/valkyrie/valkyrie_controller_diagram.h"
+#include "drake/examples/bhpn_drake_interface/src/utils/bdisc_parser.h"
 #include "drake/examples/bhpn_drake_interface/src/simulators/valkyrie/valkyrie_world_diagram.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/lcmt_contact_results_for_viz.hpp"
@@ -27,22 +29,31 @@ namespace bhpn_drake_interface {
 
 void main(int argc, char* argv[]) {
 
+  bdisc_parser::simulator_conf conf = bdisc_parser::parse(argv[1]);
+  
   // Create the appropriate simulator and controller, given the robot.
   drake::lcm::DrakeLcm lcm;
-   
   systems::DiagramBuilder<double> diagram_builder;
   
   // Add the valkyrie world plant and set it up to take commands from a controller and publish state information.
-  diagram_builder.AddSystem<ValkyrieWorldDiagram>(&lcm);
-  
+  auto valkyrie_world_diagram = diagram_builder.AddSystem<ValkyrieWorldDiagram>(conf, &lcm);
+
   // Create the simulation.
   std::unique_ptr<systems::Diagram<double>> diagram = diagram_builder.Build(); 
   systems::Simulator<double> simulator(*diagram);
   auto context = simulator.get_mutable_context();
   simulator.reset_integrator<systems::SemiExplicitEulerIntegrator<double>>(
-      *diagram, 3e-4, context);
+      *diagram, 2e-4, context);
   simulator.set_publish_every_time_step(false);
-
+  
+  // Set the initial joint positions.
+  auto plant_ = valkyrie_world_diagram->get_mutable_plant();
+  for (int index = 0; index < plant_->get_rigid_body_tree().get_num_actuators();
+       index++) {
+    plant_->set_position(simulator.get_mutable_context(), index+6,
+                       conf.initial_robot_joint_positions[index]);
+  }
+  
   // Start the simulation.
   lcm.StartReceiveThread();
   simulator.StepTo(999999999999);

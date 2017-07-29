@@ -229,14 +229,6 @@ lcm_cc_library(
 )
 
 lcm_cc_library(
-    name = "plant_body_position_data",
-    lcm_package = "drake",
-    lcm_srcs = [
-        "lcmt_plant_body_position_data.lcm",
-    ],
-)
-
-lcm_cc_library(
     name = "iiwa",
     lcm_package = "drake",
     lcm_srcs = [
@@ -304,7 +296,6 @@ DRAKE_LCMTYPES = [
     ":whole_body_data",
     ":zmp_data",
     ":zmp_com_observer_state",
-    ":plant_body_position_data",
 ]
 
 # This rule should list every LCM type that is known to Drake or its external

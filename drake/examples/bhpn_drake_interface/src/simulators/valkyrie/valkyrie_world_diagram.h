@@ -11,10 +11,9 @@
 #include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
 #include "drake/common/find_resource.h"
 #include "drake/common/text_logging.h"
-#include "drake/examples/Valkyrie/actuator_effort_to_rigid_body_plant_input_converter.h"
-#include "drake/examples/Valkyrie/robot_command_to_desired_effort_converter.h"
-#include "drake/examples/bhpn_drake_interface/src/simulators/valkyrie/robot_state_encoder.h"
-#include "drake/examples/Valkyrie/valkyrie_constants.h"
+#include "drake/examples/valkyrie/actuator_effort_to_rigid_body_plant_input_converter.h"
+#include "drake/examples/valkyrie/robot_command_to_desired_effort_converter.h"
+#include "drake/examples/valkyrie/valkyrie_constants.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/lcmt_contact_results_for_viz.hpp"
 #include "drake/multibody/parsers/urdf_parser.h"
@@ -65,47 +64,28 @@ std::unique_ptr<RigidBodyTree<double>> build_world_tree(
 
 class ValkyrieWorldDiagram : public systems::Diagram<double> {
  public:
-  explicit ValkyrieWorldDiagram(drake::lcm::DrakeLcm* lcm) {
+  explicit ValkyrieWorldDiagram(bdisc_parser::simulator_conf conf, drake::lcm::DrakeLcm* lcm) {
     systems::DiagramBuilder<double> builder;
 
     // Create RigidBodyTree with just Valkyrie
     valkyrie_tree_ = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
-        drake::FindResourceOrThrow("drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf"), multibody::joints::kQuaternion, valkyrie_tree_.get());
+        drake::FindResourceOrThrow("drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf"), multibody::joints::kRollPitchYaw, valkyrie_tree_.get());
 
     // Create RigidBodyTree with Valkyrie and other objects and use this one to construct the plant.
     std::vector<ModelInstanceInfo<double>> world_info;
-    std::vector<std::string> names;
-    names.push_back("valkyrie");
-    names.push_back("drake_table");
+    std::vector<std::string> names = conf.object_names;
+    names.insert(names.begin(), "valkyrie");
+    std::vector<std::string> description_paths = conf.object_description_paths;
+    description_paths.insert(description_paths.begin(), "drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf");
+    std::vector<Eigen::Vector3d> initial_poses_xyz = conf.initial_object_poses_xyz;
+    initial_poses_xyz.insert(initial_poses_xyz.begin(), conf.initial_robot_pose_xyz);
+    std::vector<Eigen::Vector3d> initial_poses_rpy = conf.initial_object_poses_rpy;
+    initial_poses_rpy.insert(initial_poses_rpy.begin(), conf.initial_robot_pose_rpy);
+    std::vector<bool> fixed = conf.object_fixed;
+    fixed.insert(fixed.begin(), false);
 
-    std::vector<std::string> description_paths;
-    description_paths.push_back("drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf");
-    description_paths.push_back("drake/examples/bhpn_drake_interface/objects/drake_table.sdf");
-
-    std::vector<Eigen::Vector3d> initial_poses_xyz;
-    Eigen::Vector3d initial_valkyrie_pose_xyz;
-    initial_valkyrie_pose_xyz << 0, 0, 1.2;
-    initial_poses_xyz.push_back(initial_valkyrie_pose_xyz);
-
-    Eigen::Vector3d initial_table_pose_xyz;
-    initial_table_pose_xyz << 2.0, 0, 0.4;
-    initial_poses_xyz.push_back(initial_table_pose_xyz);
-
-    std::vector<Eigen::Vector3d> initial_poses_rpy;
-    Eigen::Vector3d initial_valkyrie_pose_rpy;
-    initial_valkyrie_pose_rpy << 0, 0, 0;
-    initial_poses_rpy.push_back(initial_valkyrie_pose_rpy);
-
-    Eigen::Vector3d initial_table_pose_rpy;
-    initial_table_pose_rpy << 0, 0, 0;
-    initial_poses_rpy.push_back(initial_table_pose_rpy);
-
-    std::vector<bool> fixed;
-    fixed.push_back(false);
-    fixed.push_back(false);
-
-    auto plant_ =
+    plant_ =
         builder.AddSystem<systems::RigidBodyPlant<double>>(build_world_tree(&world_info, names, description_paths, initial_poses_xyz, initial_poses_rpy, fixed));
     plant_->set_name("plant");
 

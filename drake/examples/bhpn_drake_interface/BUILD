@@ -26,19 +26,6 @@ filegroup(
 )
 
 drake_cc_library(
-    name = "robot_state_encoder",
-    srcs = ["src/simulators/valkyrie/robot_state_encoder.cc"],
-    hdrs = ["src/simulators/valkyrie/robot_state_encoder.h"],
-    deps = [
-        "//drake/manipulation/util:robot_state_msg_translator",
-        "//drake/multibody/rigid_body_plant",
-        "//drake/systems/robotInterfaces:side",
-        "//drake/util",
-        "//drake/util:lcm_util",
-    ],
-)
-
-drake_cc_library(
     name = "robot_state_lcm",
     srcs = ["src/utils/robot_state_lcm.cc"],
     hdrs = ["src/utils/robot_state_lcm.h"],
@@ -78,10 +65,9 @@ drake_cc_library(
     name = "valkyrie_world_diagram",
     hdrs = ["src/simulators/valkyrie/valkyrie_world_diagram.h"],
     deps = [
-        "//drake/examples/Valkyrie:actuator_effort_to_rigid_body_plant_input_converter",
-        "//drake/examples/Valkyrie:robot_command_to_desired_effort_converter",
-        ":robot_state_encoder",
-        "//drake/examples/Valkyrie:valkyrie_constants",
+        "//drake/examples/valkyrie:actuator_effort_to_rigid_body_plant_input_converter",
+        "//drake/examples/valkyrie:robot_command_to_desired_effort_converter",
+        "//drake/examples/valkyrie:valkyrie_constants",
 	"//drake/examples/kuka_iiwa_arm:oracular_state_estimator",
         "//drake/common:find_resource",
         "//drake/lcm",
@@ -102,22 +88,6 @@ drake_cc_library(
 )
 
 drake_cc_library(
-    name = "valkyrie_controller_diagram",
-    hdrs = ["src/simulators/valkyrie/valkyrie_controller_diagram.h"],
-    deps = [
-        "//drake/examples/QPInverseDynamicsForHumanoids/system:atlas_joint_level_controller_system",
-        "//drake/examples/QPInverseDynamicsForHumanoids/system:humanoid_plan_eval_system",
-        "//drake/examples/QPInverseDynamicsForHumanoids/system:humanoid_status_translator_system",
-        "//drake/examples/QPInverseDynamicsForHumanoids/system:qp_controller_system",
-        "//drake/lcm",
-        "//drake/multibody/parsers",
-        "//drake/systems/framework",
-        "//drake/systems/lcm",
-        "@lcmtypes_bot2_core",
-    ],
-)
-
-drake_cc_library(
     name = "robot_plan_interpolator",
     srcs = ["src/utils/robot_plan_interpolator.cc"],
     hdrs = ["src/utils/robot_plan_interpolator.h"],
@@ -131,6 +101,11 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "bdisc_parser",
+    hdrs = ["src/utils/bdisc_parser.h"],
+    )
+
 drake_cc_binary(
     name = "pr2_simulator",
     srcs = ["src/simulators/pr2/pr2_simulator.cc"],
@@ -139,6 +114,7 @@ drake_cc_binary(
 	":robot_plan_interpolator",
         ":world_sim_tree_builder",
         ":plan_status_lcm",
+        ":bdisc_parser",
         "//drake/lcm",
 	"//drake/util:lcm_util",
         "//drake/multibody/rigid_body_plant",
@@ -167,12 +143,12 @@ drake_cc_binary(
     name = "valkyrie_simulator",
     srcs = ["src/simulators/valkyrie/valkyrie_simulator.cc"],
     deps = [
+	":bdisc_parser",
         ":robot_state_lcm",
 	":robot_plan_interpolator",
         ":world_sim_tree_builder",
         ":plan_status_lcm",
 	":valkyrie_world_diagram",
-	":valkyrie_controller_diagram",
         "//drake/lcm",
 	"//drake/util:lcm_util",
         "//drake/multibody/rigid_body_plant",

@@ -65,7 +65,7 @@ int WorldSimTreeBuilder<T>::AddFloatingModelInstance(const string& model_name,
       aligned_allocator<RigidBodyFrame<T>>(), "world", nullptr, xyz, rpy);
 
   return AddModelInstanceToFrame(model_name, xyz, rpy, weld_to_frame,
-                                 multibody::joints::kQuaternion);
+                                 multibody::joints::kRollPitchYaw);
 }
 
 template <typename T>
