@@ -52,8 +52,11 @@ void send_manip_message() {
   msg.num_states = 1;
   msg.plan.resize(msg.num_states);
   msg.plan_info.resize(msg.num_states, 1);
-
+  std::cout << "len q: " << q.size() << "\n";
   q[10] -= 0.5;  // right shoulder pitch
+  q[
+  q[2] = 0.0; //For some reason I need this
+  std::cout << "q: " << q << "\n";
   translator.InitializeMessage(&(msg.plan[0]));
   translator.EncodeMessageKinematics(q, v, &(msg.plan[0]));
   msg.plan[0].utime = 1e6;
