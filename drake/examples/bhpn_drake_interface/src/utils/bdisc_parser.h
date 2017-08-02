@@ -1,4 +1,5 @@
 #include <fstream>
+#include <iterator>
 
 namespace bdisc_parser{
 

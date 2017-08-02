@@ -60,9 +60,9 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
             + bhpn_robot_conf['pr2Torso']\
             + bhpn_robot_conf['pr2Head']\
             + bhpn_robot_conf['pr2RightArm']\
-            + [min([0.5, 100*bhpn_robot_conf['pr2RightGripper'][0]**2])] * 2\
+            + [min([0.5, max([0.15, 100*bhpn_robot_conf['pr2RightGripper'][0]**2])])] * 2\
             + bhpn_robot_conf['pr2LeftArm']\
-            + [min([0.5, 100*bhpn_robot_conf['pr2LeftGripper'][0]**2])] * 2
+            + [min([0.5, max([0.15, 100*bhpn_robot_conf['pr2LeftGripper'][0]**2])])] * 2
 
     def get_joint_list_names(self):
         return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
@@ -122,14 +122,14 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
             gripped_results[object_name] = self.get_object_gripped_function(object_type)(object_name, bhpn_drake_interface_obj)
         return gripped_results
 
-    def pick(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj, timeout=60):
+    def pick(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj, timeout=300):
         # Basic picking procedure. Not really that reactive (except it does ensure that the object is gripped hard enough). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
         
         # Constants
         step_time = 50000
         dx = 0.07
         dy = 0.05
-        dz = 0.0
+        dz = -0.05
         width_open = 0.07
         min_width_closed = 0.035
 
@@ -158,7 +158,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
         
-        return bhpn_drake_interface_obj.is_gripped(hand, obj)
+        return True # TODO: possibly make this is_gripped (if only the is_gripped method weren't so finnicky)
 
     def place(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj, timeout=60):
         # Basic placing procedure. Not really that reactive (except it does ensure that the object is not gripped). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
@@ -172,12 +172,10 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         start_conf_correct_hand_conf = start_conf.set(start_conf.robot.gripperChainNames[hand], hand_closed_conf)
         target_conf_correct_hand_conf = target_conf.set(target_conf.robot.gripperChainNames[hand], hand_closed_conf)
         path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_correct_hand_conf, target_conf_correct_hand_conf], 0.01)
-        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
-
         target_conf_open = target_conf.set(target_conf.robot.gripperChainNames[hand], [width_open])
-        path = [target_conf_open, target_conf_open]
-        plan += bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
+        path += [target_conf_open, target_conf_open, target_conf_open, target_conf_open]
 
+        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
         
         return not bhpn_drake_interface_obj.is_gripped(hand, obj)

@@ -70,7 +70,7 @@ void main(int argc, char* argv[]) {
   std::vector<std::string> names = conf.object_names;
   names.insert(names.begin(), "pr2");
   std::vector<std::string> description_paths = conf.object_description_paths;
-  description_paths.insert(description_paths.begin(), "drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf");
+  description_paths.insert(description_paths.begin(), "drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement_no_collisions_except_grippers.urdf");
   std::vector<Eigen::Vector3d> initial_poses_xyz = conf.initial_object_poses_xyz;
   initial_poses_xyz.insert(initial_poses_xyz.begin(), conf.initial_robot_pose_xyz);
   std::vector<Eigen::Vector3d> initial_poses_rpy = conf.initial_object_poses_rpy;
@@ -98,7 +98,7 @@ void main(int argc, char* argv[]) {
   plan_receiver->set_name("plan_receiver");
 
   auto command_injector = diagram_builder.AddSystem<RobotPlanInterpolator>(
-      drake::FindResourceOrThrow("drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf"));
+      drake::FindResourceOrThrow("drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement_no_collisions_except_grippers.urdf"));
   command_injector->set_name("command_injector");
   
   auto plan_status_pub = diagram_builder.AddSystem(
@@ -174,13 +174,35 @@ void main(int argc, char* argv[]) {
   diagram_builder.Connect(contact_viz->get_output_port(0),
                            contact_results_publisher->get_input_port(0));
 
+  // Contact parameters.
+  const double kStaticFriction = 0.9;
+  const double kDynamicFriction = 0.3;
+  const double kStictionSlipTolerance = 0.01;
+  plant_->set_friction_contact_parameters(kStaticFriction, kDynamicFriction, kStictionSlipTolerance);
+
+  const double kStiffness = 2500;
+  const double kDissipation = 250;
+  plant_->set_normal_contact_parameters(kStiffness, kDissipation);
+  
   // Create the simulation object.
-  lcm.StartReceiveThread();
   std::unique_ptr<systems::Diagram<double>> diagram = diagram_builder.Build();
   systems::Simulator<double> simulator(*diagram);
   auto context = simulator.get_mutable_context();
+  
   simulator.reset_integrator<systems::SemiExplicitEulerIntegrator<double>>(
-      *diagram, 5e-4, context);
+      *diagram, 1e-4, context);
+  
+  /*
+  simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(
+      *diagram, context);
+  simulator.get_mutable_integrator()->set_target_accuracy(1e-3);
+  simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
+  */
+  /*
+  simulator.reset_integrator<systems::RungeKutta3Integrator<double>>(*diagram, context);
+  simulator.get_mutable_integrator()->set_target_accuracy(1e-2);
+  simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
+  */
 
   // Set the initial joint positions.
   for (int index = 0; index < plant_->get_rigid_body_tree().get_num_actuators();
@@ -197,7 +219,7 @@ void main(int argc, char* argv[]) {
                                plan_source_context.get_mutable_state());
 
   // Start the simulation.
-  simulator.Initialize();
+  lcm.StartReceiveThread();
   simulator.set_target_realtime_rate(1.0);
   simulator.StepTo(999999999999);
 }

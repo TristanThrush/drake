@@ -78,7 +78,7 @@ class BhpnDrakeInterface:
         
         # Start the drake simulation.
         self.create_bdisc()
-        self.drake_simulation = subprocess.Popen('cd ' + interface_build_path_absolute + '; exec ' + interface_build_path_absolute + self.robot_simulator_executable + ' ' + interface_path_absolute + 'tmp/simulator_conf.bdisc', shell=True)
+        self.drake_simulation = subprocess.Popen('cd ' + drake_path + '; exec ' + interface_build_path + self.robot_simulator_executable + ' ' + interface_path + 'tmp/simulator_conf.bdisc', shell=True)
         
         # Wait to get full information from drake simulation.
         while self.drake_robot_conf is None or self.contact_results is None or self.plan_status is None:
@@ -109,12 +109,12 @@ class BhpnDrakeInterface:
         type_description.close()
         text = text.replace(object_type, object_name)
         # I know that the following is not robost to every path name, but I think it will be fine (hopefully)
-        name_description_path = type_description_path.split(object_type).replace(object_type, object_name).replace('objects', 'tmp') 
+        name_description_path = type_description_path.replace(object_type, object_name).replace('objects', 'tmp') 
         name_description = open(name_description_path, 'w')
         name_description.write(text)
         name_description.close()
         self.generated_description_paths.append(name_description_path)
-        return supported_object_types[object_type].replace(object_type, object_name)
+        return supported_object_types[object_type].replace(object_type, object_name).replace('objects', 'tmp')
 
     def create_bdisc(self):
         initial_robot_pose = '0 0 0 0 0 0'

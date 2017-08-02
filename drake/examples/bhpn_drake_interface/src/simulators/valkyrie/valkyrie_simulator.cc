@@ -42,9 +42,16 @@ void main(int argc, char* argv[]) {
   std::unique_ptr<systems::Diagram<double>> diagram = diagram_builder.Build(); 
   systems::Simulator<double> simulator(*diagram);
   auto context = simulator.get_mutable_context();
+
+  /*
   simulator.reset_integrator<systems::SemiExplicitEulerIntegrator<double>>(
       *diagram, 2e-4, context);
   simulator.set_publish_every_time_step(false);
+  */
+  simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(
+      *diagram, context);
+  simulator.get_mutable_integrator()->set_target_accuracy(1e-3);
+  simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
   
   // Set the initial joint positions.
   auto plant_ = valkyrie_world_diagram->get_mutable_plant();
