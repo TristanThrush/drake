@@ -68,7 +68,14 @@ bool RungeKutta3Integrator<T>::DoStep(const T& dt) {
   // Get the derivative at the current state (x0) and time (t0).
   this->CalcTimeDerivatives(context, derivs0_.get());
   const auto& xcdot0 = derivs0_->get_vector();
-
+  /*
+  std::cout << "\n";
+  //std::cout << "xcdot0: " << "\n" << "size: " << xcdot0.size() << "\n" << xcdot0.CopyToVector() << "\n";
+  std::cout << "xcdot0 index 68: " << xcdot0.GetAtIndex(68) << "\n";
+  std::cout << "xcdot0 index 69: " << xcdot0.GetAtIndex(69) << "\n";
+  std::cout << "xcdot0 index 70: " << xcdot0.GetAtIndex(70) << "\n";
+  std::cout << "\n";
+  */
   // Compute the first intermediate state and derivative (at t=0.5, x(0.5)).
   this->get_mutable_context()->set_time(ta + dt * 0.5);
   xc->PlusEqScaled(dt * 0.5, xcdot0);

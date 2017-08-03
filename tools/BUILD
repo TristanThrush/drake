@@ -1,12 +1,12 @@
 # -*- python -*-
 
-load("//tools:bazel_lint.bzl", "bazel_lint")
 load(
-    "//tools:install.bzl",
+    "@drake//tools:install.bzl",
     "cmake_config",
     "exports_create_cps_scripts",
     "install_cmake_config",
 )
+load("//tools:lint.bzl", "add_lint_tests")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -78,6 +78,7 @@ py_binary(
 py_binary(
     name = "drakelint",
     srcs = ["drakelint.py"],
+    deps = ["//drake/tools:formatter"],
 )
 
 py_binary(
@@ -371,4 +372,4 @@ config_setting(
     },
 )
 
-bazel_lint()
+add_lint_tests()

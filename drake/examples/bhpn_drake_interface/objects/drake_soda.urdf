@@ -12,8 +12,8 @@
       <geometry>
         <box size="0.09 0.05 0.12" />
       </geometry>
-      <material name="bright green">
-        <color rgba="0.0 0.9 0.0 1" />
+      <material name="salmon">
+        <color rgba="1.0 0.4 0.4 1" />
       </material>
     </visual>
     <!--

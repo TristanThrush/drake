@@ -130,8 +130,8 @@ void main(int argc, char* argv[]) {
       15, 15, 15, 15, 0, 0;
   ki *= 0.3;
   VectorX<double> kd(num_actuators);
-  kd << 18200, 18200, 7500, 7, 7, 7, 75, 50, 7, 7, 2, 7, 1, 1, 1, 75, 50, 7, 7,
-      2, 7, 1, 1, 1;
+  kd << 18200, 18200, 7500, 7, 7, 7, 75, 50, 7, 7, 2, 7, 1, 0, 0, 75, 50, 7, 7,
+      2, 7, 1, 0, 0;
   kd *= 0.1;
   auto Binv = plant_->get_rigid_body_tree()
                   .B.block(0, 0, num_actuators, num_actuators)
@@ -175,13 +175,13 @@ void main(int argc, char* argv[]) {
                            contact_results_publisher->get_input_port(0));
 
   // Contact parameters.
-  const double kStaticFriction = 0.9;
-  const double kDynamicFriction = 0.3;
-  const double kStictionSlipTolerance = 0.01;
+  const double kStaticFriction = 1.0;
+  const double kDynamicFriction = 0.5;
+  const double kStictionSlipTolerance = 0.001;
   plant_->set_friction_contact_parameters(kStaticFriction, kDynamicFriction, kStictionSlipTolerance);
 
-  const double kStiffness = 2500;
-  const double kDissipation = 250;
+  const double kStiffness = 1000;
+  const double kDissipation = 100;
   plant_->set_normal_contact_parameters(kStiffness, kDissipation);
   
   // Create the simulation object.
@@ -200,7 +200,7 @@ void main(int argc, char* argv[]) {
   */
   /*
   simulator.reset_integrator<systems::RungeKutta3Integrator<double>>(*diagram, context);
-  simulator.get_mutable_integrator()->set_target_accuracy(1e-2);
+  simulator.get_mutable_integrator()->set_target_accuracy(1e-1);
   simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
   */
 
@@ -217,6 +217,8 @@ void main(int argc, char* argv[]) {
   command_injector->Initialize(plan_source_context.get_time(),
                                conf.initial_robot_joint_positions,
                                plan_source_context.get_mutable_state());
+
+  std::cout << "continuous state size: " << context->get_continuous_state_vector().size() << "\n";
 
   // Start the simulation.
   lcm.StartReceiveThread();
