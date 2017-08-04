@@ -15,14 +15,7 @@ class RobotBhpnDrakeConnection:
     def get_joint_list_names(self):
         raise NotImplementedError
 
-    def get_urdf_path(self):
-        raise NotImplementedError
-
     def get_num_joints(self):
-        raise NotImplementedError
-
-    def get_move_threshold(self):
-        # TODO: you wont need this when you figure out how to properly finish the path. so figure that out.
         raise NotImplementedError
 
     def get_hands_to_end_effectors(self):

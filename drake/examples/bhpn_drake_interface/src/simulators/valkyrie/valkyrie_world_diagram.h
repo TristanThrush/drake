@@ -70,14 +70,14 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     // Create RigidBodyTree with just Valkyrie
     valkyrie_tree_ = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
-        drake::FindResourceOrThrow("drake/examples/Valkyrie/urdf/urdf/valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf"), multibody::joints::kRollPitchYaw, valkyrie_tree_.get());
+        drake::FindResourceOrThrow("drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf"), multibody::joints::kRollPitchYaw, valkyrie_tree_.get());
 
     // Create RigidBodyTree with Valkyrie and other objects and use this one to construct the plant.
     std::vector<ModelInstanceInfo<double>> world_info;
     std::vector<std::string> names = conf.object_names;
     names.insert(names.begin(), "valkyrie");
     std::vector<std::string> description_paths = conf.object_description_paths;
-    description_paths.insert(description_paths.begin(), "drake/examples/Valkyrie/urdf/urdf/valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf");
+    description_paths.insert(description_paths.begin(), "drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf");
     std::vector<Eigen::Vector3d> initial_poses_xyz = conf.initial_object_poses_xyz;
     initial_poses_xyz.insert(initial_poses_xyz.begin(), conf.initial_robot_pose_xyz);
     std::vector<Eigen::Vector3d> initial_poses_rpy = conf.initial_object_poses_rpy;

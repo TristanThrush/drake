@@ -1364,7 +1364,8 @@
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
   </link>
-  <joint name="leftPinkyPitch1" type="fixed">
+  <joint name="leftPinkyPitch1" type="fixed"> <!-- used to be fixed. I (Tristan Thrush) made it revolute and added the limit tag to correspond to the hw urdf --> 
+    <limit effort="10" lower="-0.26179938765" upper="0" velocity="1"/>
     <origin rpy="-0.1222 0.0 0.0" xyz="0.0022 0.0838 -0.041"/>
     <axis xyz="0 0 1"/>
     <parent link="leftPalm"/>
@@ -1391,6 +1392,11 @@
   <gazebo reference="leftPinkyPitch3">
     <implicitSpringDamper>1</implicitSpringDamper>
   </gazebo>
+
+
+  <!-- begin drake hack to add actuators for fingers -->
+
+  <!-- end drake hack to add actuators for fingers -->
   <link name="rightHipYawLink">
     <inertial>
       <mass value="2.39"/>

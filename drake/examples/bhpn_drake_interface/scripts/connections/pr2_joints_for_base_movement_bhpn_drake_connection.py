@@ -26,7 +26,6 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         RobotBhpnDrakeConnection.__init__(self, bhpn_robot_conf)
         self.robot_type = 'pr2'
         self.num_joints = 24
-        self.urdf_path = 'drake/examples/PR2/pr2_with_joints_for_base_movement_and_limited_gripper_movement.urdf'
         self.original_move_threshold = np.array([.015, .015, .015, .012, .012, .012, .012, .012, .012, .012, .012, .012, .012, .015, .015, .012, .012, .012, .012, .012, .012, .012, .015, .015])
         self.move_threshold = self.original_move_threshold.copy()
         self.move_threshold *= 4
@@ -67,9 +66,6 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
     def get_joint_list_names(self):
         return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
     
-    def get_urdf_path(self):
-        return self.urdf_path
-
     def get_num_joints(self):
         return self.num_joints
 
@@ -121,6 +117,9 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
             gripped_results[object_name] = self.get_object_gripped_function(object_type)(object_name, bhpn_drake_interface_obj)
         return gripped_results
 
+    def maintain_pick_conf(self, bhpn_robot_conf, hand):
+        return bhpn_robot_conf.set(start_conf.robot.gripperChainNames[hand], [min_width_closed])
+
     def pick(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj):
         # Basic picking procedure. Not really that reactive (except it does ensure that the object is gripped hard enough). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
         
@@ -171,7 +170,6 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         return not bhpn_drake_interface_obj.is_gripped(hand, obj)
 
 
-#TODO: get rid of this! it uses non-drake invKin
 def displaceHand(conf, hand, dx=0.0, dy=0.0, dz=0.0,
                  zFrom=None, maxTarget=None, nearTo=None):
     print 'displaceHand'
