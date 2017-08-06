@@ -16,7 +16,7 @@ namespace qp_inverse_dynamics {
 void controller_loop() {
   const std::string kModelFileName = FindResourceOrThrow(
       "drake/examples/valkyrie/urdf/urdf/"
-      "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf");
+      "valkyrie.urdf");
   const std::string kAliasGroupPath = FindResourceOrThrow(
       "drake/examples/QPInverseDynamicsForHumanoids/"
       "config/valkyrie.alias_groups");

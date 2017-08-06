@@ -43,16 +43,22 @@ void main(int argc, char* argv[]) {
   systems::Simulator<double> simulator(*diagram);
   auto context = simulator.get_mutable_context();
 
-  
+  /*
   simulator.reset_integrator<systems::SemiExplicitEulerIntegrator<double>>(
       *diagram, 1e-4, context);
   simulator.set_publish_every_time_step(false);
+  */
   /*
   simulator.reset_integrator<systems::ImplicitEulerIntegrator<double>>(
       *diagram, context);
   simulator.get_mutable_integrator()->set_target_accuracy(1e-3);
   simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
   */
+  
+  simulator.reset_integrator<systems::RungeKutta3Integrator<double>>(*diagram, context);
+  simulator.get_mutable_integrator()->set_target_accuracy(1e-1);
+  simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
+  
   // Set the initial joint positions.
   auto plant_ = valkyrie_world_diagram->get_mutable_plant();
   for (int index = 0; index < plant_->get_rigid_body_tree().get_num_actuators();

@@ -22,14 +22,19 @@ void send_manip_message() {
   RigidBodyTree<double> robot;
   drake::parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
       "drake/examples/valkyrie/urdf/urdf/"
-      "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf",
+      "valkyrie.urdf",
       multibody::joints::kRollPitchYaw, &robot);
 
-  DRAKE_DEMAND(examples::valkyrie::kRPYValkyrieDof ==
-               robot.get_num_positions());
-  VectorX<double> q = examples::valkyrie::RPYValkyrieFixedPointState().head(
-      examples::valkyrie::kRPYValkyrieDof);
+  //DRAKE_DEMAND(examples::valkyrie::kRPYValkyrieDof ==
+               //robot.get_num_positions());
+  VectorX<double> q(62);
+  q << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, 0.300196631343025, 1.25, 0, 0.785398163397448, 1.571, 0, 0, 0.300196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
   VectorX<double> v = VectorX<double>::Zero(robot.get_num_velocities());
+
+  VectorX<double> q2(62);
+  q2 << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, 0.300196631343025, 1.25, 0, 0.785398163397448, 1.571, 0, 0, -0.200196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, -0.5, -0.5, -0.5, -0.08, -0.5, -0.5, -0.5, -0.5, -0.5, -0.2, -0.5, -0.5;
+  VectorX<double> v2 = VectorX<double>::Zero(robot.get_num_velocities());
+
 
   const manipulation::RobotStateLcmMessageTranslator translator(robot);
 
@@ -52,13 +57,17 @@ void send_manip_message() {
   msg.num_states = 1;
   msg.plan.resize(msg.num_states);
   msg.plan_info.resize(msg.num_states, 1);
-  std::cout << "len q: " << q.size() << "\n";
-  q[10] -= 0.5;  // right shoulder pitch
-  q[2] = 0.0; //For some reason I need this
-  std::cout << "q: " << q << "\n";
+  
+  //q[10] -= 0.5;  // right shoulder pitch
   translator.InitializeMessage(&(msg.plan[0]));
-  translator.EncodeMessageKinematics(q, v, &(msg.plan[0]));
+  translator.EncodeMessageKinematics(q2, v2, &(msg.plan[0]));
   msg.plan[0].utime = 1e6;
+  /*
+  //q2[10] -= 0.5;
+  translator.InitializeMessage(&(msg.plan[1]));
+  translator.EncodeMessageKinematics(q2, v2, &(msg.plan[1]));
+  msg.plan[1].utime = 2e6;
+*/
 
   lcm::LCM lcm;
   lcm.publish("VALKYRIE_MANIP_PLAN", &msg);

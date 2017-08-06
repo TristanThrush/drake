@@ -101,11 +101,11 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     builder.Connect(valkyrie_state_est_->get_output_port_msg(), robot_state_publisher.get_input_port(0));	
 
     // Contact parameters
-    const double kStiffness = 100000;
-    const double kDissipation = 5.0;
-    const double kStaticFriction = 0.9;
+    const double kStiffness = 1000;
+    const double kDissipation = 100.0;
+    const double kStaticFriction = 1.0;
     const double kDynamicFriction = 0.5;
-    const double kStictionSlipTolerance = 0.01;
+    const double kStictionSlipTolerance = 0.4;
     plant_->set_normal_contact_parameters(kStiffness, kDissipation);
     plant_->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                             kStictionSlipTolerance);
