@@ -117,6 +117,7 @@ class BhpnDrakeInterface:
         return supported_object_types[object_type].replace(object_type, object_name).replace('objects', 'tmp')
 
     def create_bdisc(self):
+        self.fixed_objects = ['drake_table1', 'drake_table2']
         initial_robot_pose = '0 0 0 0 0 0'
         initial_robot_joint_positions = ''
         for joint in self.robot_connection.get_drake_robot_conf(self.bhpn_robot_conf).joint_position:

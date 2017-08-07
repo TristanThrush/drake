@@ -118,7 +118,8 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         return gripped_results
 
     def maintain_pick_conf(self, bhpn_robot_conf, hand):
-        return bhpn_robot_conf.set(start_conf.robot.gripperChainNames[hand], [min_width_closed])
+        min_width_closed = 0.01
+        return bhpn_robot_conf.set(bhpn_robot_conf.robot.gripperChainNames[hand], [min_width_closed])
 
     def pick(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj):
         # Basic picking procedure. Not really that reactive (except it does ensure that the object is gripped hard enough). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
@@ -129,7 +130,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         dy = 0.05
         dz = 0.0
         width_open = 0.07
-        min_width_closed = 0.035
+        min_width_closed = 0.01
 
         # Move gripper around object.
         start_conf_open = start_conf.set(start_conf.robot.gripperChainNames[hand], [width_open])
