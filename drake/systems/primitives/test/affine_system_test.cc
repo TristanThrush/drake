@@ -1,6 +1,7 @@
 #include "drake/systems/primitives/affine_system.h"
 
 #include "drake/common/eigen_matrix_compare.h"
+#include "drake/systems/framework/test_utilities/scalar_conversion.h"
 #include "drake/systems/primitives/test/affine_linear_test.h"
 
 using std::make_unique;
@@ -98,6 +99,26 @@ TEST_F(AffineSystemTest, Output) {
 
   EXPECT_TRUE(CompareMatrices(
       expected_output, system_output_->get_vector_data(0)->get_value(), 1e-10));
+}
+
+// Tests converting to different scalar types.
+TEST_F(AffineSystemTest, ConvertScalarType) {
+  EXPECT_TRUE(is_autodiffxd_convertible(*dut_, [&](const auto& converted) {
+    EXPECT_EQ(converted.A(), A_);
+    EXPECT_EQ(converted.B(), B_);
+    EXPECT_EQ(converted.f0(), f0_);
+    EXPECT_EQ(converted.C(), C_);
+    EXPECT_EQ(converted.D(), D_);
+    EXPECT_EQ(converted.y0(), y0_);
+  }));
+  EXPECT_TRUE(is_symbolic_convertible(*dut_, [&](const auto& converted) {
+    EXPECT_EQ(converted.A(), A_);
+    EXPECT_EQ(converted.B(), B_);
+    EXPECT_EQ(converted.f0(), f0_);
+    EXPECT_EQ(converted.C(), C_);
+    EXPECT_EQ(converted.D(), D_);
+    EXPECT_EQ(converted.y0(), y0_);
+  }));
 }
 
 class FeedthroughAffineSystemTest : public ::testing::Test {
@@ -322,8 +343,10 @@ TEST_F(AffineSystemSymbolicTest, MakeAffineSystem) {
   EXPECT_EQ(dut->time_period(), 10.0);
 }
 
+// Adds quadratic terms to check if we have an exception. Note that we have
+// similar testcases in drake/common/test/symbolic_decompose_test.cc file but we
+// believe that having redundancy is not bad in testing.
 TEST_F(AffineSystemSymbolicTest, MakeAffineSystemException1) {
-  // Add quadratic terms to check if we have an exception.
   VectorX<symbolic::Expression> extra_terms(3);
   // clang-format off
   extra_terms << x0_ * x0_,
@@ -336,8 +359,8 @@ TEST_F(AffineSystemSymbolicTest, MakeAffineSystemException1) {
                std::runtime_error);
 }
 
+// Adds bilinear terms to check if we have an exception.
 TEST_F(AffineSystemSymbolicTest, MakeAffineSystemException2) {
-  // Add bilinear terms to check if we have an exception.
   VectorX<symbolic::Expression> extra_terms(3);
   // clang-format off
   extra_terms << x0_ * u0_,
@@ -350,8 +373,8 @@ TEST_F(AffineSystemSymbolicTest, MakeAffineSystemException2) {
                std::runtime_error);
 }
 
+// Adds nonlinear terms to check if we have an exception.
 TEST_F(AffineSystemSymbolicTest, MakeAffineSystemException3) {
-  // Add nonlinear terms to check if we have an exception.
   VectorX<symbolic::Expression> extra_terms(3);
   // clang-format off
   extra_terms << sin(x0_),
