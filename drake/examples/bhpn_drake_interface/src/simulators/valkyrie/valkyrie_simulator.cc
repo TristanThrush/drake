@@ -1,7 +1,6 @@
 #include <gflags/gflags.h>
 #include <fstream>
 #include <typeinfo>
-#include "gperftools/profiler.h"
 #include "robotlocomotion/robot_plan_t.hpp"
 #include "drake/common/find_resource.h"
 #include "drake/common/text_logging_gflags.h"

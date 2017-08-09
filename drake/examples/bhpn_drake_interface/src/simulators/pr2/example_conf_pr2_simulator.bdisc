@@ -1,4 +1,2 @@
 0. 0. 0. 0. 0. 0.
-0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.5 0.5 0. 0. 0. 0. 0. 0. 0. 0.5 0.5 
-drake_table drake/examples/bhpn_drake_interface/objects/drake_table.sdf 2. 0. 0.38225 0. 0. 0. false
-drake_soda drake/examples/bhpn_drake_interface/objects/drake_soda.urdf 2. 0. 0.8425 0. 0. 0. false
+0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.5 0.5 0.5 0.5 0. 0. 0. 0. 0. 0. 0. 0.5 0.5 0.5 0.5

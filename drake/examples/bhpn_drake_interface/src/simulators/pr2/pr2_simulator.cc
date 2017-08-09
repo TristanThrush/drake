@@ -1,8 +1,6 @@
 #include <gflags/gflags.h>
-#include "gperftools/profiler.h"
 #include "robotlocomotion/robot_plan_t.hpp"
 #include "drake/common/find_resource.h"
-#include "drake/common/text_logging_gflags.h"
 #include "drake/examples/bhpn_drake_interface/src/utils/robot_state_lcm.h"
 #include "drake/examples/bhpn_drake_interface/src/utils/plan_status_lcm.h"
 #include "drake/examples/bhpn_drake_interface/src/utils/world_sim_tree_builder.h"
@@ -22,7 +20,6 @@
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
-
 
 namespace drake {
 namespace examples {
@@ -53,7 +50,15 @@ std::unique_ptr<RigidBodyTree<double>> build_world_tree(
   }
 
   tree_builder->AddGround();
-  return tree_builder->Build();
+  std::unique_ptr<RigidBodyTree<double>> tree_ = tree_builder->Build();
+  
+  auto remove_collisions_filter = [&](const std::string& group_name){
+    return group_name == "non_gripper";
+  };
+  tree_->removeCollisionGroupsIf(remove_collisions_filter);
+  tree_->compile();
+  return tree_;
+
 }
 
 void main(int argc, char* argv[]) {
@@ -61,7 +66,7 @@ void main(int argc, char* argv[]) {
    // Declare diagram builder and lcm
   systems::DiagramBuilder<double> diagram_builder;
   drake::lcm::DrakeLcm lcm;
-  const int num_actuators = 24;
+  const int num_actuators = 28;
 
   // Construct the world tree, throw it into a plant, and add it to our diagram.
   bdisc_parser::simulator_conf conf = bdisc_parser::parse(argv[1]);
@@ -70,14 +75,14 @@ void main(int argc, char* argv[]) {
   std::vector<std::string> names = conf.object_names;
   names.insert(names.begin(), "pr2");
   std::vector<std::string> description_paths = conf.object_description_paths;
-  description_paths.insert(description_paths.begin(), "drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement_no_collisions_except_grippers.urdf");
+  description_paths.insert(description_paths.begin(), "drake/examples/pr2/pr2_with_joints_for_base_movement_and_completely_actuated_gripper_movement_collision_groups.urdf");
   std::vector<Eigen::Vector3d> initial_poses_xyz = conf.initial_object_poses_xyz;
   initial_poses_xyz.insert(initial_poses_xyz.begin(), conf.initial_robot_pose_xyz);
   std::vector<Eigen::Vector3d> initial_poses_rpy = conf.initial_object_poses_rpy;
   initial_poses_rpy.insert(initial_poses_rpy.begin(), conf.initial_robot_pose_rpy);
   std::vector<bool> fixed = conf.object_fixed;
   fixed.insert(fixed.begin(), true);
-  
+    
   auto plant_ = diagram_builder.AddSystem<systems::RigidBodyPlant<double>>(build_world_tree(&world_info, names, description_paths, initial_poses_xyz, initial_poses_rpy, fixed));
   plant_->set_name("plant_");
   auto pr2_instance_id = world_info[0].instance_id;
@@ -98,7 +103,7 @@ void main(int argc, char* argv[]) {
   plan_receiver->set_name("plan_receiver");
 
   auto command_injector = diagram_builder.AddSystem<RobotPlanInterpolator>(
-      drake::FindResourceOrThrow("drake/examples/pr2/pr2_with_joints_for_base_movement_and_limited_gripper_movement_no_collisions_except_grippers.urdf"));
+      drake::FindResourceOrThrow("drake/examples/pr2/pr2_with_joints_for_base_movement_and_completely_actuated_gripper_movement_collision_groups.urdf"));
   command_injector->set_name("command_injector");
   
   auto plan_status_pub = diagram_builder.AddSystem(
@@ -123,15 +128,15 @@ void main(int argc, char* argv[]) {
   // Add the controller and wire the appropriate systems together.
   VectorX<double> kp(num_actuators);
   kp << 2000, 2000, 5000, 800000, 1000, 1000, 4000, 4100, 2000, 2000, 400, 400,
-      100, 50, 50, 4000, 4100, 2000, 2000, 400, 400, 100, 50, 50;
+      100, 50, 50, 50, 50, 4000, 4100, 2000, 2000, 400, 400, 100, 50, 50, 50, 50;
   kp *= 0.5;
   VectorX<double> ki(num_actuators);
-  ki << 0, 0, 15, 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 0, 0, 15, 15, 15,
-      15, 15, 15, 15, 0, 0;
+  ki << 0, 0, 15, 50000, 15, 15, 15, 15, 15, 15, 15, 15, 15, 0, 0, 0, 0, 15, 15, 15,
+      15, 15, 15, 15, 0, 0, 0, 0;
   ki *= 0.3;
   VectorX<double> kd(num_actuators);
-  kd << 18200, 18200, 7500, 7, 7, 7, 75, 50, 7, 7, 2, 7, 1, 0, 0, 75, 50, 7, 7,
-      2, 7, 1, 0, 0;
+  kd << 18200, 18200, 7500, 7, 7, 7, 75, 50, 7, 7, 2, 7, 1, 0, 0, 0, 0, 75, 50, 7, 7,
+      2, 7, 1, 0, 0, 0, 0;
   kd *= 0.1;
   auto Binv = plant_->get_rigid_body_tree()
                   .B.block(0, 0, num_actuators, num_actuators)

@@ -25,10 +25,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
     def __init__(self, bhpn_robot_conf):
         RobotBhpnDrakeConnection.__init__(self, bhpn_robot_conf)
         self.robot_type = 'pr2'
-        self.num_joints = 24
-        self.original_move_threshold = np.array([.015, .015, .015, .012, .012, .012, .012, .012, .012, .012, .012, .012, .012, .015, .015, .012, .012, .012, .012, .012, .012, .012, .015, .015])
-        self.move_threshold = self.original_move_threshold.copy()
-        self.move_threshold *= 4
+        self.num_joints = 28
 
     def get_bhpn_robot_conf(self, drake_robot_conf):
         drake_joints = drake_robot_conf.joint_position
@@ -37,8 +34,8 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
                    'pr2Head': drake_joints[4:6],
                    'pr2RightArm': drake_joints[6:13],
                    'pr2RightGripper': [np.sqrt(drake_joints[13:14][0]/100.0)],
-                   'pr2LeftArm': drake_joints[15:22],
-                   'pr2LeftGripper': [np.sqrt(drake_joints[22:23][0]/100.0)]}
+                   'pr2LeftArm': drake_joints[17:24],
+                   'pr2LeftGripper': [np.sqrt(drake_joints[24:25][0]/100.0)]}
         for k, v in mapping.items():
             self.bhpn_robot_conf = self.bhpn_robot_conf.set(k, list(v))
         return self.bhpn_robot_conf.copy()
@@ -59,33 +56,21 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
             + bhpn_robot_conf['pr2Torso']\
             + bhpn_robot_conf['pr2Head']\
             + bhpn_robot_conf['pr2RightArm']\
-            + [min([0.5, max([0.15, 100*bhpn_robot_conf['pr2RightGripper'][0]**2])])] * 2\
+            + [min([0.5, max([0.15, 100*bhpn_robot_conf['pr2RightGripper'][0]**2])])] * 4\
             + bhpn_robot_conf['pr2LeftArm']\
-            + [min([0.5, max([0.15, 100*bhpn_robot_conf['pr2LeftGripper'][0]**2])])] * 2
+            + [min([0.5, max([0.15, 100*bhpn_robot_conf['pr2LeftGripper'][0]**2])])] * 4
 
     def get_joint_list_names(self):
-        return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint']
+        return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'r_gripper_l_finger_tip_joint', 'r_gripper_r_finger_tip_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint', 'l_gripper_l_finger_tip_joint', 'l_gripper_r_finger_tip_joint']
     
     def get_num_joints(self):
         return self.num_joints
 
-    def get_move_threshold(self):
-        return self.move_threshold.copy()
-
-    def set_ignored_move_threshold(self, index, ignore):
-        if ignore:
-            self.move_threshold[index] = float('inf')
-        else:
-            self.move_threshold[index] = self.original_move_threshold[index]
-
     def get_hands_to_end_effectors(self):
         return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
-
-    def get_drake_hand_joint_indices(self):
-        return {'left': (22, 23), 'right': (13, 14)}
-
+    
     def get_drake_continuous_joint_indices(self):
-        return (2, 8, 10, 12, 17, 19, 21)
+        return (2, 8, 10, 12, 19, 21, 23)
 
     def drake_soda_gripped_function(self, object_name, bhpn_drake_interface_obj):
         contact_force_magnitude_threshold = 2.0

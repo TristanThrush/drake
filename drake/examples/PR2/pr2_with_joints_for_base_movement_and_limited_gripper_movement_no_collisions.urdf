@@ -2150,9 +2150,9 @@
       <verbose value="Yes"/>
     </collision-->
   </link>
-  <joint name="r_gripper_l_finger_tip_joint" type="fixed">
+  <joint name="r_gripper_l_finger_tip_joint" type="revolute">
     <axis xyz="0 0 -1"/>
-    <origin rpy="0 0 -0.3" xyz="0.09137 0.00495 0"/>
+    <origin rpy="0 0 0" xyz="0.09137 0.00495 0"/>
     <limit effort="1000.0" lower="0.0" upper="0.548" velocity="0.5"/>
     <dynamics damping="0.01"/>
     <mimic joint="r_gripper_l_finger_joint" multiplier="1" offset="0"/>
@@ -2180,9 +2180,9 @@
       <verbose value="Yes"/>
     </collision-->
   </link>
-  <joint name="r_gripper_r_finger_tip_joint" type="fixed">
+  <joint name="r_gripper_r_finger_tip_joint" type="revolute">
     <axis xyz="0 0 1"/>
-    <origin rpy="0 0 0.3" xyz="0.09137 -0.00495 0"/> 
+    <origin rpy="0 0 0" xyz="0.09137 -0.00495 0"/> 
     <limit effort="1000.0" lower="0.0" upper="0.548" velocity="0.5"/>
     <dynamics damping="0.01"/>
     <mimic joint="r_gripper_l_finger_joint" multiplier="1" offset="0"/>
@@ -2452,6 +2452,17 @@
     <joint name="r_gripper_r_finger_joint"/>
     <mechanicalReduction>1.0</mechanicalReduction>
   </transmission>
+  <transmission name="r_gripper_l_finger_tip_trans" type="SimpleTransmission">
+    <actuator name="r_gripper_l_finger_tip_motor"/>
+    <joint name="r_gripper_l_finger_tip_joint"/>
+    <mechanicalReduction>1.0</mechanicalReduction>
+  </transmission>
+  <transmission name="r_gripper_r_finger_tip_trans" type="SimpleTransmission">
+    <actuator name="r_gripper_r_finger_tip_motor"/>
+    <joint name="r_gripper_r_finger_tip_joint"/>
+    <mechanicalReduction>1.0</mechanicalReduction>
+  </transmission>
+
   <joint name="l_shoulder_pan_joint" type="revolute">
     <axis xyz="0 0 1"/>
     <origin rpy="0 0 0" xyz="0.0 0.188 0.0"/>
@@ -3102,9 +3113,9 @@
       <verbose value="Yes"/>
     </collision-->
   </link>
-  <joint name="l_gripper_l_finger_tip_joint" type="fixed">
+  <joint name="l_gripper_l_finger_tip_joint" type="revolute">
     <axis xyz="0 0 -1"/>
-    <origin rpy="0 0 -0.6" xyz="0.09137 0.00495 0"/>
+    <origin rpy="0 0 0" xyz="0.09137 0.00495 0"/>
     <limit effort="1000.0" lower="0.0" upper="0.548" velocity="0.5"/>
     <dynamics damping="0.01"/>
     <mimic joint="l_gripper_l_finger_joint" multiplier="1" offset="0"/>
@@ -3132,9 +3143,9 @@
       <verbose value="Yes"/>
     </collision-->
   </link>
-  <joint name="l_gripper_r_finger_tip_joint" type="fixed">
+  <joint name="l_gripper_r_finger_tip_joint" type="revolute">
     <axis xyz="0 0 1"/>
-    <origin rpy="0 0 0.6" xyz="0.09137 -0.00495 0"/>
+    <origin rpy="0 0 0" xyz="0.09137 -0.00495 0"/>
     <limit effort="1000.0" lower="0.0" upper="0.548" velocity="0.5"/>
     <dynamics damping="0.01"/>
     <mimic joint="l_gripper_l_finger_joint" multiplier="1" offset="0"/>
@@ -3370,6 +3381,16 @@
   <transmission name="l_gripper_r_finger_trans" type="SimpleTransmission">
     <actuator name="l_gripper_r_finger_motor"/>
     <joint name="l_gripper_r_finger_joint"/>
+    <mechanicalReduction>1.0</mechanicalReduction>
+  </transmission>
+  <transmission name="l_gripper_l_finger_tip_trans" type="SimpleTransmission">
+    <actuator name="l_gripper_l_finger_tip_motor"/>
+    <joint name="l_gripper_l_finger_tip_joint"/>
+    <mechanicalReduction>1.0</mechanicalReduction>
+  </transmission>
+  <transmission name="l_gripper_r_finger_tip_trans" type="SimpleTransmission">
+    <actuator name="l_gripper_r_finger_tip_motor"/>
+    <joint name="l_gripper_r_finger_tip_joint"/>
     <mechanicalReduction>1.0</mechanicalReduction>
   </transmission>
   <!-- Forearm cam Position is a guess, based on full robot calibration -->
