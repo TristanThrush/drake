@@ -213,6 +213,8 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     builder.Connect(
         actuator_effort_to_rigid_body_plant_input_converter.get_output_port(0),
         plant_->get_input_port(0));
+    std::cout << "plant input size: " << plant_->get_input_port(0).size() << "\n";
+    std::cout << "plant actuator size: " << plant_->model_instance_actuator_command_input_port(world_info[0].instance_id).size() << "\n";
 
     // Raw state vector to visualizer.
     builder.Connect(plant_->state_output_port(),

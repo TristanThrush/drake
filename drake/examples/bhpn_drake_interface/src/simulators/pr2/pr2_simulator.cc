@@ -53,7 +53,7 @@ std::unique_ptr<RigidBodyTree<double>> build_world_tree(
   std::unique_ptr<RigidBodyTree<double>> tree_ = tree_builder->Build();
   
   auto remove_collisions_filter = [&](const std::string& group_name){
-    return group_name == "non_gripper";
+    return group_name == "non_grippers";
   };
   tree_->removeCollisionGroupsIf(remove_collisions_filter);
   tree_->compile();
@@ -75,7 +75,7 @@ void main(int argc, char* argv[]) {
   std::vector<std::string> names = conf.object_names;
   names.insert(names.begin(), "pr2");
   std::vector<std::string> description_paths = conf.object_description_paths;
-  description_paths.insert(description_paths.begin(), "drake/examples/pr2/pr2_with_joints_for_base_movement_and_completely_actuated_gripper_movement_collision_groups.urdf");
+  description_paths.insert(description_paths.begin(), "drake/examples/pr2/pr2_with_joints_for_base_movement_and_completely_actuated_gripper_movement_no_collisions_except_finger_tips.urdf");
   std::vector<Eigen::Vector3d> initial_poses_xyz = conf.initial_object_poses_xyz;
   initial_poses_xyz.insert(initial_poses_xyz.begin(), conf.initial_robot_pose_xyz);
   std::vector<Eigen::Vector3d> initial_poses_rpy = conf.initial_object_poses_rpy;
@@ -103,7 +103,7 @@ void main(int argc, char* argv[]) {
   plan_receiver->set_name("plan_receiver");
 
   auto command_injector = diagram_builder.AddSystem<RobotPlanInterpolator>(
-      drake::FindResourceOrThrow("drake/examples/pr2/pr2_with_joints_for_base_movement_and_completely_actuated_gripper_movement_collision_groups.urdf"));
+      drake::FindResourceOrThrow("drake/examples/pr2/pr2_with_joints_for_base_movement_and_completely_actuated_gripper_movement_no_collisions_except_finger_tips.urdf"));
   command_injector->set_name("command_injector");
   
   auto plan_status_pub = diagram_builder.AddSystem(

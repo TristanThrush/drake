@@ -58,7 +58,7 @@ void send_manip_message() {
   msg.plan.resize(msg.num_states);
   msg.plan_info.resize(msg.num_states, 1);
   
-  //q[10] -= 0.5;  // right shoulder pitch
+  q2[10] -= 0.5;  // right shoulder pitch
   translator.InitializeMessage(&(msg.plan[0]));
   translator.EncodeMessageKinematics(q2, v2, &(msg.plan[0]));
   msg.plan[0].utime = 1e6;
