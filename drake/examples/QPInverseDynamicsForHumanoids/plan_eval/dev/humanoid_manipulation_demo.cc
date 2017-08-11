@@ -47,7 +47,7 @@ void send_manip_message() {
   // knot points specified here.
   robotlocomotion::robot_plan_t msg{};
   msg.utime = time(NULL);
-  msg.num_states = 15;
+  msg.num_states = 20;
   msg.plan.resize(msg.num_states);
   msg.plan_info.resize(msg.num_states, 1);
 
@@ -55,6 +55,20 @@ void send_manip_message() {
 	VectorX<double> new_q(40);
 	new_q << q;
 	new_q[39] -= (index+1)*.1;
+	new_q[38] -= (index+1)*.05;
+
+	translator.InitializeMessage(&(msg.plan[index]));
+  	translator.EncodeMessageKinematics(new_q, v, &(msg.plan[index]));
+  	msg.plan[index].utime = (index+1)*1e5;
+
+  }
+
+  for(int index = 15; index < 20; index ++){
+	VectorX<double> new_q(40);
+	new_q << q;
+	new_q[39] -= 1.5;
+	new_q[38] -= 0.75;
+	new_q[10] -= (index-14)*.1;
 
 	translator.InitializeMessage(&(msg.plan[index]));
   	translator.EncodeMessageKinematics(new_q, v, &(msg.plan[index]));

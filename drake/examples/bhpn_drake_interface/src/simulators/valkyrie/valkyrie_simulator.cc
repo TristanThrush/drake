@@ -44,7 +44,7 @@ void main(int argc, char* argv[]) {
 
   
   simulator.reset_integrator<systems::SemiExplicitEulerIntegrator<double>>(
-      *diagram, 1e-4, context);
+      *diagram, 2e-4, context);
   simulator.set_publish_every_time_step(false);
   
   /*

@@ -110,7 +110,7 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     const double kDissipation = 100.0;
     const double kStaticFriction = 1.0;
     const double kDynamicFriction = 0.5;
-    const double kStictionSlipTolerance = 0.05;
+    const double kStictionSlipTolerance = 0.01;
     plant_->set_normal_contact_parameters(kStiffness, kDissipation);
     plant_->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                             kStictionSlipTolerance);
@@ -248,7 +248,7 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
   auto valkyrie_instance_id = world_info[0].instance_id;
   VectorX<double> kp(num_joints);
   kp << VectorX<double>::Zero(30), 1, 1, 1, 1;
-  kp *= 0.5;
+  kp *= 1.0;
   VectorX<double> ki(num_joints);
   ki << VectorX<double>::Zero(30), 0, 0, 0, 0;
   VectorX<double> kd(num_joints);
