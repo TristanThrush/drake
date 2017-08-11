@@ -7,6 +7,7 @@
 
 #include "lcmtypes/bot_core/atlas_command_t.hpp"
 #include "lcmtypes/bot_core/robot_state_t.hpp"
+#include "robotlocomotion/robot_plan_t.hpp"
 
 #include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
 #include "drake/common/find_resource.h"
@@ -29,6 +30,10 @@
 #include "drake/systems/lcm/lcmt_drake_signal_translator.h"
 #include "drake/systems/primitives/constant_vector_source.h"
 #include "drake/systems/primitives/pass_through.h"
+#include "drake/systems/primitives/multiplexer.h"
+#include "drake/systems/primitives/demultiplexer.h"
+#include "drake/systems/controllers/pid_controller.h"
+#include "drake/examples/bhpn_drake_interface/src/utils/robot_plan_interpolator.h"
 
 namespace drake {
 namespace examples {
@@ -70,14 +75,14 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     // Create RigidBodyTree with just Valkyrie
     valkyrie_tree_ = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
-        drake::FindResourceOrThrow("drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf"), multibody::joints::kRollPitchYaw, valkyrie_tree_.get());
+        drake::FindResourceOrThrow("drake/examples/Valkyrie/urdf/urdf/valkyrie_limited_finger_movement_no_collisions.urdf"), multibody::joints::kRollPitchYaw, valkyrie_tree_.get());
 
     // Create RigidBodyTree with Valkyrie and other objects and use this one to construct the plant.
     std::vector<ModelInstanceInfo<double>> world_info;
     std::vector<std::string> names = conf.object_names;
     names.insert(names.begin(), "valkyrie");
     std::vector<std::string> description_paths = conf.object_description_paths;
-    description_paths.insert(description_paths.begin(), "drake/examples/Valkyrie/urdf/urdf/valkyrie.urdf");
+    description_paths.insert(description_paths.begin(), "drake/examples/Valkyrie/urdf/urdf/valkyrie_limited_finger_movement_no_collisions.urdf");
     std::vector<Eigen::Vector3d> initial_poses_xyz = conf.initial_object_poses_xyz;
     initial_poses_xyz.insert(initial_poses_xyz.begin(), conf.initial_robot_pose_xyz);
     std::vector<Eigen::Vector3d> initial_poses_rpy = conf.initial_object_poses_rpy;
@@ -103,9 +108,9 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     // Contact parameters
     const double kStiffness = 1000;
     const double kDissipation = 100.0;
-    const double kStaticFriction = 1.0;
-    const double kDynamicFriction = 0.5;
-    const double kStictionSlipTolerance = 0.4;
+    const double kStaticFriction = 0.5;
+    const double kDynamicFriction = 0.25;
+    const double kStictionSlipTolerance = 0.5;
     plant_->set_normal_contact_parameters(kStiffness, kDissipation);
     plant_->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                             kStictionSlipTolerance);
@@ -210,11 +215,14 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     }
 
     // Plant input to plant.
+    
+    // QP controller output to actuator input. The QP controllerleaves the fingers limp and the PID controller is responsible for the fingers.
+    /*
     builder.Connect(
         actuator_effort_to_rigid_body_plant_input_converter.get_output_port(0),
         plant_->get_input_port(0));
     std::cout << "plant input size: " << plant_->get_input_port(0).size() << "\n";
-    std::cout << "plant actuator size: " << plant_->model_instance_actuator_command_input_port(world_info[0].instance_id).size() << "\n";
+    std::cout << "plant actuator size: " << plant_->model_instance_actuator_command_input_port(world_info[0].instance_id).size() << "\n";*/
 
     // Raw state vector to visualizer.
     builder.Connect(plant_->state_output_port(),
@@ -226,14 +234,92 @@ class ValkyrieWorldDiagram : public systems::Diagram<double> {
     builder.Connect(contact_viz.get_output_port(0),
                     contact_results_publisher.get_input_port(0));
 
+
+    // Add a PID controller for the fingers to listen for plans seperately from the QP controller
+    auto plan_receiver = builder.AddSystem(
+      systems::lcm::LcmSubscriberSystem::Make<robotlocomotion::robot_plan_t>(
+          "VALKYRIE_MANIP_PLAN", lcm));
+  plan_receiver->set_name("plan_receiver");
+
+  command_injector = builder.AddSystem<RobotPlanInterpolator>(
+      drake::FindResourceOrThrow("drake/examples/valkyrie/urdf/urdf/valkyrie_limited_finger_movement_no_collisions.urdf"));
+  command_injector->set_name("command_injector");
+  const int num_joints = 34;
+  auto valkyrie_instance_id = world_info[0].instance_id;
+  VectorX<double> kp(num_joints);
+  kp << VectorX<double>::Zero(30), 1, 1, 1, 1;
+  kp *= 0.5;
+  VectorX<double> ki(num_joints);
+  ki << VectorX<double>::Zero(30), 0, 0, 0, 0;
+  VectorX<double> kd(num_joints);
+  kd << VectorX<double>::Zero(30), 0, 0, 0, 0;
+  auto controller = builder.AddSystem<systems::controllers::PidController<double>>(
+      std::make_unique<systems::controllers::PidController<double>>(kp, ki, kd));
+
+  std::cout << "state size: " << plant_->model_instance_state_output_port(valkyrie_instance_id).size() << "\n";
+  std::cout << "cinj size: " << command_injector->get_state_input_port().size() << "\n";
+  auto valkyrie_state_demux = builder.AddSystem<systems::Demultiplexer<double>>(80, 1);
+  builder.Connect(plant_->model_instance_state_output_port(valkyrie_instance_id), valkyrie_state_demux->get_input_port(0));
+  auto valkyrie_state_no_floating_joints = builder.AddSystem<systems::Multiplexer<double>>(68);
+  for (int index = 6; index < 40; index ++){
+	builder.Connect(valkyrie_state_demux->get_output_port(index), valkyrie_state_no_floating_joints->get_input_port(index-6));
+}
+  for (int index = 46; index < 80; index ++){
+	builder.Connect(valkyrie_state_demux->get_output_port(index), valkyrie_state_no_floating_joints->get_input_port(index-12));
+}
+  std::cout << "havent crashed yet 1" << "\n";
+  builder.Connect(
+      valkyrie_state_no_floating_joints->get_output_port(0),
+      command_injector->get_state_input_port());
+  builder.Connect(plan_receiver->get_output_port(0),
+                           command_injector->get_plan_input_port());
+
+  std::cout << "havent crashed yet 2" << "\n";
+  builder.Connect(command_injector->get_state_output_port(),
+                           controller->get_input_port_desired_state());
+  
+  std::cout << "havent crashed yet 3" << "\n";
+  builder.Connect(
+      valkyrie_state_no_floating_joints->get_output_port(0),
+      controller->get_input_port_estimated_state());
+  
+  std::cout << "havent crashed yet 4" << "\n";
+
+  auto qp_controller_demux = builder.AddSystem<systems::Demultiplexer<double>>(34, 1);
+  builder.Connect(actuator_effort_to_rigid_body_plant_input_converter.get_output_port(0), qp_controller_demux->get_input_port(0));
+  auto pid_controller_demux = builder.AddSystem<systems::Demultiplexer<double>>(34, 1);
+  builder.Connect(controller->get_output_port_control(), pid_controller_demux->get_input_port(0));
+  auto controller_mux = builder.AddSystem<systems::Multiplexer<double>>(34);
+
+  for (int index = 0; index < 30; index ++){
+	builder.Connect(qp_controller_demux->get_output_port(index), controller_mux->get_input_port(index));
+
+}
+
+for (int index = 30; index < 34; index ++){
+	builder.Connect(pid_controller_demux->get_output_port(index), controller_mux->get_input_port(index));
+
+}
+
+ 
+  builder.Connect(
+      controller_mux->get_output_port(0),
+      plant_->get_input_port(0));
+
+  
+  std::cout << "havent crashed yet 5" << "\n";
+
     builder.BuildInto(this);
   }
 
   systems::RigidBodyPlant<double>* get_mutable_plant() { return plant_; }
+  
+  RobotPlanInterpolator* get_command_injector() { return command_injector; }
 
  private:
   systems::RigidBodyPlant<double>* plant_;
   std::unique_ptr<RigidBodyTree<double>> valkyrie_tree_;
+  RobotPlanInterpolator* command_injector;
 };
 
 }  // namespace bhpn_drake_interface

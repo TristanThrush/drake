@@ -55,7 +55,7 @@ void main(int argc, char* argv[]) {
   */
   /*
   simulator.reset_integrator<systems::RungeKutta3Integrator<double>>(*diagram, context);
-  simulator.get_mutable_integrator()->set_target_accuracy(1e-1);
+  simulator.get_mutable_integrator()->set_target_accuracy(5e-1);
   simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
   */
   // Set the initial joint positions.
@@ -65,6 +65,12 @@ void main(int argc, char* argv[]) {
     plant_->set_position(simulator.get_mutable_context(), index+6,
                        conf.initial_robot_joint_positions[index]);
   }
+
+  auto& plan_source_context = diagram->GetMutableSubsystemContext(
+      *valkyrie_world_diagram->get_command_injector(), simulator.get_mutable_context());
+  valkyrie_world_diagram->get_command_injector()->Initialize(plan_source_context.get_time(),
+                               conf.initial_robot_joint_positions,
+                               plan_source_context.get_mutable_state());
   
   // Start the simulation.
   lcm.StartReceiveThread();

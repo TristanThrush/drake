@@ -22,18 +22,22 @@ void send_manip_message() {
   RigidBodyTree<double> robot;
   drake::parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
       "drake/examples/valkyrie/urdf/urdf/"
-      "valkyrie.urdf",
+      "valkyrie_limited_finger_movement_no_collisions.urdf",
       multibody::joints::kRollPitchYaw, &robot);
 
   //DRAKE_DEMAND(examples::valkyrie::kRPYValkyrieDof ==
                //robot.get_num_positions());
-  VectorX<double> q(62);
-  q << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, 0.300196631343025, 1.25, 0, 0.785398163397448, 1.571, 0, 0, 0.300196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+  VectorX<double> q(40);
+  q << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, 0.300196631343025, 1.25, 0, 0.785398163397448, 1.571, 0, 0, 0.300196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, 0, 0; // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
   VectorX<double> v = VectorX<double>::Zero(robot.get_num_velocities());
 
-  VectorX<double> q2(62);
-  q2 << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, 0.300196631343025, 1.25, 0, 0.785398163397448, 1.571, 0, 0, -0.200196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, -0.5, -0.5, -0.5, -0.08, -0.5, -0.5, -0.5, -0.5, -0.5, -0.2, -0.5, -0.5;
+  VectorX<double> q2(40);
+  q2 << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, 0.300196631343025, 1.25, 0, 0.785398163397448, 1.571, 0, 0, -0.200196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, -1.4, 0, 0, -1.5; // 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, -0.5, -0.5, -0.5, -0.08, -0.5, -0.5, -0.5, -0.5, -0.5, -0.2, -0.5, -0.5;
   VectorX<double> v2 = VectorX<double>::Zero(robot.get_num_velocities());
+
+  VectorX<double> q3(40);
+  q2 << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, 0.300196631343025, 1.25, 0, 0.785398163397448, 1.571, 0, 0, -0.200196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, -1.4, 0, 0, -1.5; // 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, -0.5, -0.5, -0.5, -0.08, -0.5, -0.5, -0.5, -0.5, -0.5, -0.2, -0.5, -0.5;
+
 
 
   const manipulation::RobotStateLcmMessageTranslator translator(robot);
@@ -54,20 +58,21 @@ void send_manip_message() {
   // knot points specified here.
   robotlocomotion::robot_plan_t msg{};
   msg.utime = time(NULL);
-  msg.num_states = 1;
+  msg.num_states = 2;
   msg.plan.resize(msg.num_states);
-  msg.plan_info.resize(msg.num_states, 1);
+  msg.plan_info.resize(msg.num_states, 2);
   
   q2[10] -= 0.5;  // right shoulder pitch
+  q3[10] -= 1.0;  
   translator.InitializeMessage(&(msg.plan[0]));
   translator.EncodeMessageKinematics(q2, v2, &(msg.plan[0]));
-  msg.plan[0].utime = 1e6;
-  /*
+  msg.plan[0].utime = 2e6;
+  
   //q2[10] -= 0.5;
   translator.InitializeMessage(&(msg.plan[1]));
-  translator.EncodeMessageKinematics(q2, v2, &(msg.plan[1]));
-  msg.plan[1].utime = 2e6;
-*/
+  translator.EncodeMessageKinematics(q3, v2, &(msg.plan[1]));
+  msg.plan[1].utime = 5e6;
+
 
   lcm::LCM lcm;
   lcm.publish("VALKYRIE_MANIP_PLAN", &msg);
