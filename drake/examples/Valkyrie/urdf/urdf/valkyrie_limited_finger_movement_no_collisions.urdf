@@ -2474,7 +2474,7 @@
 	  </link>
 	  <joint name="leftThumbRoll" type="fixed">
 	    <limit effort="10" lower="-0.08726646255" upper="2.35619448885" velocity="1"/>
-	    <origin rpy="-0.3491 2.3 0.0" xyz="0.0049 0.0351 0.0228"/>
+	    <origin rpy="-0.3491 2.0 0.0" xyz="0.0049 0.0351 0.0228"/>
 	    <axis xyz="0 1 0"/>
 	    <parent link="leftPalm"/>
 	    <child link="leftThumbRollLink"/>
@@ -2934,7 +2934,7 @@
 	  </link>
 	  <joint name="rightThumbRoll" type="fixed">
 	    <limit effort="10" lower="-0.08726646255" upper="2.35619448885" velocity="1"/>
-	    <origin rpy="0.3491 2.3 0.0" xyz="0.0049 -0.0351 0.0228"/>
+	    <origin rpy="0.3491 2.0 0.0" xyz="0.0049 -0.0351 0.0228"/>
 	    <axis xyz="0 1 0"/>
 	    <parent link="rightPalm"/>
 	    <child link="rightThumbRollLink"/>
