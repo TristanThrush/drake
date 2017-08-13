@@ -13,7 +13,6 @@ from operator import sub
 import time
 import atexit
 import math
-import pydrake
 import numpy as np
 import subprocess
 import signal
@@ -57,10 +56,11 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
             state.utime = utime
             state.num_joints = self.num_drake_joints
             state.joint_name = self.get_joint_list_names()
-            state.joint_position = [0]*9 + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[:15] + [0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0] + get_joint_list_only_bhpn_joints(bhpn_robot_conf)[15:]
-            state.joint_velocity = [0]*state.num_drake_joints
-            state.joint_effort = [0]*state.num_drake_joints
+            state.joint_position = [0]*3 + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[:15] + [0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0] + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[15:]
+            state.joint_velocity = [0]*state.num_joints
+            state.joint_effort = [0]*state.num_joints
             drake_robot_confs.append(state)
+            print 'len jonit position: ', len(state.joint_position)
             utime += time_spacing
         return drake_robot_confs
 
@@ -68,8 +68,8 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
         return bhpn_robot_conf['robotHead']\
             + bhpn_robot_conf['robotRightArm']\
             + bhpn_robot_conf['robotLeftArm']\
-            + bhpn_robot_conf['robotLeftGripper']\
-            + bhpn_robot_conf['robotRightGripper']
+            + bhpn_robot_conf['robotLeftGripper'] * 2\
+            + bhpn_robot_conf['robotRightGripper'] * 2
 
     def get_joint_list_names(self):
         return [
@@ -130,7 +130,7 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
         gripper_end_effector_to_gripped_objects = {
             'leftPalm': [], 'rightPalm': []}
         necessary_collisions_for_l_gripper_grip = set(
-            ['leftIndexFingerPitch3Link', 'leftThumbPitch3Link'])\
+            ['leftIndexFingerPitch3Link', 'leftThumbPitch3Link'])
         necessary_collisions_for_r_gripper_grip = set(
             ['rightIndexFingerPitch3Link', 'rightThumbPitch3Link'])
         necessary_collisions_combined = set()

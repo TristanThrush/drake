@@ -33,7 +33,6 @@ class BhpnDrakeInterface:
             self,
             robot_type,
             bhpn_robot_conf,
-            fixed_robot,
             object_types,
             bhpn_object_confs,
             fixed_objects,
@@ -50,7 +49,6 @@ class BhpnDrakeInterface:
         # Store the arguments.
         self.robot_type = robot_type
         self.bhpn_robot_conf = bhpn_robot_conf.copy()
-        self.fixed_robot = fixed_robot
         self.object_types = object_types.copy()
         self.bhpn_object_confs = bhpn_object_confs.copy()
         self.fixed_objects = fixed_objects.copy()
