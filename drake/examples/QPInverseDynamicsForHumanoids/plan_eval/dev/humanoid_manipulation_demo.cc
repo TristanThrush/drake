@@ -26,7 +26,7 @@ void send_manip_message() {
       multibody::joints::kRollPitchYaw, &robot);
 
   VectorX<double> q(40);
-  q << 0, 0, 0, 0., 0., 0., 0, 0, 0, 0, -0.2, 1.25, 0, 0.785398163397448, 1.571, 0, 0, -0.200196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, -1.4, 0, 0, 0;
+  q << 1.2, 0, 1.025, 0., 0., 0., 0, 0, 0, 0, -0.2, 1.25, 0, 0.785398163397448, 1.571, 0, 0, -0.200196631343025, -1.25, 0, -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0, -1.4, 0, 0, 0;
   VectorX<double> v = VectorX<double>::Zero(robot.get_num_velocities());
 
   const manipulation::RobotStateLcmMessageTranslator translator(robot);
@@ -75,7 +75,7 @@ void send_manip_message() {
   	msg.plan[index].utime = (index+1)*1e5;
 
   }
-  
+
   lcm::LCM lcm;
   lcm.publish("VALKYRIE_MANIP_PLAN", &msg);
 

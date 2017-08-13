@@ -37,12 +37,12 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
 
     def get_bhpn_robot_conf(self, drake_robot_conf):
         drake_joints = drake_robot_conf.joint_position
-        mapping = {'robotBase': drake_joints[0:3],
-                   'robotLeftArm': drake_joints[3:10],
-                   'robotRightArm': drake_joints[10:17],
-                   'robotHead': drake_joints[17:18],
-                   'robotLeftGripper': drake_joints[18:20],
-                   'robotRightGripper': drake_joints[20:22]}
+        mapping = {'robotBase': [1.2, 0, 0],
+                   'robotHead': [drake_joints[3]],
+                   'robotRightArm': list(drake_joints[4:11]),
+                   'robotLeftArm': list(drake_joints[11:18]),
+                   'robotLeftGripper': [drake_joints[30]],
+                   'robotRightGripper': [drake_joints[32]]}
         for k, v in mapping.items():
             self.bhpn_robot_conf = self.bhpn_robot_conf.set(k, list(v))
         return self.bhpn_robot_conf.copy()
@@ -54,13 +54,15 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
         for bhpn_robot_conf in bhpn_robot_confs:
             state = robot_state_t()
             state.utime = utime
+            state.pose.translation.x = 1.2
+            state.pose.translation.y = 0
+            state.pose.translation.z = 1.025
             state.num_joints = self.num_drake_joints
             state.joint_name = self.get_joint_list_names()
-            state.joint_position = [0]*3 + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[:15] + [0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0] + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[15:]
+            state.joint_position = [1.2, 0, 1.025, 0, 0, 0] + [0]*3 + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[:15] + [0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0] + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[15:]
             state.joint_velocity = [0]*state.num_joints
             state.joint_effort = [0]*state.num_joints
             drake_robot_confs.append(state)
-            print 'len jonit position: ', len(state.joint_position)
             utime += time_spacing
         return drake_robot_confs
 
@@ -80,39 +82,39 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
             'pitch',
             'yaw',
             'torsoYaw',
-            'waistLeftActuator',
-            'waistRightActuator',
+            'waistLeft',
+            'waistRight',
             'lowerNeckPitch',
             'rightShoulderPitch',
             'rightShoulderRoll',
             'rightShoulderYaw',
             'rightElbowPitch',
             'rightForearmYaw',
-            'rightWristTopActuator',
-            'rightWristBottomActuator',
+            'rightWristTop',
+            'rightWristBottom',
             'leftShoulderPitch',
             'leftShoulderRoll',
             'leftShoulderYaw',
             'leftElbowPitch',
             'leftForearmYaw',
-            'leftWristTopActuator',
-            'leftWristBottomActuator',
+            'leftWristTop',
+            'leftWristBottom',
             'rightHipYaw',
             'rightHipRoll',
             'rightHipPitch',
             'rightKneePitch',
-            'rightAnkleInsideActuator',
-            'rightAnkleOutsideActuator',
+            'rightAnkleInside',
+            'rightAnkleOutside',
             'leftHipYaw',
             'leftHipRoll',
             'leftHipPitch',
             'leftKneePitch',
-            'leftAnkleInsideActuator',
-            'leftAnkleOutsideActuator',
-            'leftThumbPitch1Actuator',
-            'leftMiddleFingerPitch1Actuator',
-            'rightThumbPitch1Actuator',
-            'rightMiddleFingerPitch1Actutor']
+            'leftAnkleInside',
+            'leftAnkleOutside',
+            'leftThumbPitch1',
+            'leftMiddleFingerPitch1',
+            'rightThumbPitch1',
+            'rightMiddleFingerPitch1']
 
     def get_hands_to_end_effectors(self):
         return {'left': 'leftPalm', 'right': 'rightPalm'}
@@ -121,7 +123,7 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
         return {'left': (22, 23), 'right': (13, 14)}
 
     def get_drake_continuous_joint_indices(self):
-        return (2)
+        return [2]
 
     def drake_soda_gripped_function(
             self, object_name, bhpn_drake_interface_obj):

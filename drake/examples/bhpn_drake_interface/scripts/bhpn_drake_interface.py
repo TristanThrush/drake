@@ -25,7 +25,7 @@ interface_path_absolute = drake_path + interface_path
 interface_build_path_absolute = drake_path + interface_build_path
 
 supported_object_types = {'drake_table': interface_path + 'objects/drake_table.sdf', 'drake_soda': interface_path + 'objects/drake_soda.urdf'}
-supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator'), 'valkyrie': (ValkyrieBhpnDrakeConnection, 'valkyrie_simulator')}
+supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator', 'ROBOT_PLAN', 'ROBOT_STATE'), 'valkyrie': (ValkyrieBhpnDrakeConnection, 'valkyrie_simulator', 'VALKYRIE_MANIP_PLAN', 'EST_ROBOT_STATE')}
 
 class BhpnDrakeInterface:
 
@@ -36,6 +36,7 @@ class BhpnDrakeInterface:
             object_types,
             bhpn_object_confs,
             fixed_objects,
+            no_plan_status=False
             ):
 
         # Make sure that the drake simulation can actually be created with the given arguments.
@@ -43,8 +44,6 @@ class BhpnDrakeInterface:
             raise ValueError('This robot is unsupported by the BHPN-Drake Interface.')
         if not set(object_types.values()).issubset(set(supported_object_types.keys())):
             raise ValueError('Some of these objects are unsupported by the BHPN-Drake Interface.')
-        if bhpn_robot_conf.baseConf() != (0., 0., 0.):
-            raise ValueError('The BHPN-Drake Interface requires that the base of the robot start at 0, 0, 0.')
 
         # Store the arguments.
         self.robot_type = robot_type
@@ -61,11 +60,14 @@ class BhpnDrakeInterface:
         self.drake_robot_conf = None
         self.contact_results = None
         self.plan_status = None
+        self.no_plan_status = no_plan_status
+        if self.no_plan_status:
+            self.plan_status = plan_status_t()
         self.generated_description_paths = []
 
         # Start the lcm subscribers that listen to the drake simulatiuon for information.
         self.lc = lcm.LCM()
-        self.lc.subscribe('ROBOT_STATE', self.robot_conf_callback)
+        self.lc.subscribe(supported_robot_types[self.robot_type][3], self.robot_conf_callback)
         self.lc.subscribe('DRAKE_VIEWER_DRAW', self.object_pose_callback)
         self.lc.subscribe('CONTACT_RESULTS', self.contact_results_callback)
         self.lc.subscribe('PLAN_STATUS', self.plan_status_callback)
@@ -182,23 +184,24 @@ class BhpnDrakeInterface:
 
         last_plan_start_utime = self.plan_status.last_plan_start_utime
         print last_plan_start_utime
-        self.lc.publish('ROBOT_PLAN', plan.encode())
+        self.lc.publish(supported_robot_types[self.robot_type][2], plan.encode())
 
-        # Wait for plan to be recieved.
-        print "Waiting for plan to be recieved."
-        # TODO: fix this!
-        counter = 0
-        while self.plan_status.last_plan_start_utime == last_plan_start_utime and counter < 50:
-            counter += 1
-            time.sleep(0.1)
-        print self.plan_status.last_plan_start_utime
-        print "Plan recieved."
+        if not self.no_plan_status:
+            # TODO: fix this!
+            # Wait for plan to be recieved.
+            print "Waiting for plan to be recieved."
+            counter = 0
+            while self.plan_status.last_plan_start_utime == last_plan_start_utime and counter < 50:
+                counter += 1
+                time.sleep(0.1)
+            print self.plan_status.last_plan_start_utime
+            print "Plan recieved."
         
-        print "Waiting for plan to finish."
-        # Wait for plan to finish.
-        while self.plan_status.execution_status == 0:
-            time.sleep(0.1)
-        print "Plan finished."
+            print "Waiting for plan to finish."
+            # Wait for plan to finish.
+            while self.plan_status.execution_status == 0:
+                time.sleep(0.1)
+            print "Plan finished."
     
         print "Done following Drake robot plan."
 

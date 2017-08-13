@@ -58,17 +58,21 @@ void main(int argc, char* argv[]) {
   simulator.get_mutable_integrator()->set_maximum_step_size(5e-1);
   */
   // Set the initial joint positions.
+  VectorX<double> initial_robot_joint_positions_no_floating_joints(conf.initial_robot_joint_positions.size() - 6);
   auto plant_ = valkyrie_world_diagram->get_mutable_plant();
-  for (int index = 0; index < plant_->get_rigid_body_tree().get_num_actuators();
+  for (int index = 0; index < (int)conf.initial_robot_joint_positions.size();
        index++) {
-    plant_->set_position(simulator.get_mutable_context(), index+6,
+    plant_->set_position(simulator.get_mutable_context(), index,
                        conf.initial_robot_joint_positions[index]);
+    if (index >= 6){
+      initial_robot_joint_positions_no_floating_joints[index-6] = conf.initial_robot_joint_positions[index];
+    }
   }
-
-  auto& plan_source_context = diagram->GetMutableSubsystemContext(
+  std::cout << "init: " << initial_robot_joint_positions_no_floating_joints << "\n";
+   auto& plan_source_context = diagram->GetMutableSubsystemContext(
       *valkyrie_world_diagram->get_command_injector(), simulator.get_mutable_context());
   valkyrie_world_diagram->get_command_injector()->Initialize(plan_source_context.get_time(),
-                               conf.initial_robot_joint_positions,
+                               initial_robot_joint_positions_no_floating_joints,
                                plan_source_context.get_mutable_state());
   
   // Start the simulation.
