@@ -30,7 +30,7 @@ drake_cc_library(
     srcs = ["src/utils/robot_state_lcm.cc"],
     hdrs = ["src/utils/robot_state_lcm.h"],
     deps = [
-        "//drake/lcmtypes:robot_state",
+        "@lcmtypes_bot2_core",
         "//drake/multibody:rigid_body_tree",
         "//drake/systems/framework:leaf_system",
     ],

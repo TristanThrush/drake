@@ -130,48 +130,7 @@ TEST_F(PidControllerTest, CalcOutput) {
              kd_.array() * error_rate_signal_.array())
                 .matrix(),
             output_vector->get_value());
-<<<<<<< HEAD
-}
 
-// Evaluates the output of a controller initialized with a non-identity Binv and
-// asserts correctness.
-TEST_F(PidControllerTest, CalcOutputBinv) {
-  ASSERT_NE(nullptr, context_);
-  ASSERT_NE(nullptr, output_);
-  // this test relies on the port size being 3, because I have fixed the size of
-  // B
-  ASSERT_EQ(3, port_size_);
-  Matrix3<double> B;
-  B << 3.4, 0.0, 0.0, 0.0, 0.0, 6.7, 0.0, 5.6, 0.0;
-  MatrixX<double> Binv = B.inverse();
-
-  PidController<double> controller{
-      Binv, MatrixX<double>::Identity(2 * kp_.size(), 2 * kp_.size()), kp_, ki_,
-      kd_};
-
-  controller.CalcOutput(*context_, output_.get());
-  ASSERT_EQ(1, output_->get_num_ports());
-  const BasicVector<double>* output_vector = output_->get_vector_data(0);
-  EXPECT_EQ(3, output_vector->size());
-  EXPECT_EQ(Binv *
-                (kp_.array() * error_signal_.array() +
-                 kd_.array() * error_rate_signal_.array())
-                    .matrix(),
-            output_vector->get_value());
-
-  // Initializes the integral to a non-zero value. A more interesting example.
-  VectorX<double> integral_value(port_size_);
-  integral_value << 3.0, 2.0, 1.0;
-  controller.set_integral_value(context_.get(), integral_value);
-  controller.CalcOutput(*context_, output_.get());
-  EXPECT_EQ(Binv *
-                (kp_.array() * error_signal_.array() +
-                 ki_.array() * integral_value.array() +
-                 kd_.array() * error_rate_signal_.array())
-                    .matrix(),
-            output_vector->get_value());
-=======
->>>>>>> 075a6c018c2f4bf74e69aee081d56b8d7fd88b57
 }
 
 // Evaluates derivatives and asserts correctness.

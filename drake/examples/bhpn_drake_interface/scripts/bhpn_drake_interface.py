@@ -5,7 +5,7 @@ import threading
 from geometry import shapes, hu
 from robot import conf
 import lcm
-from drake import lcmt_robot_state, lcmt_viewer_draw, lcmt_contact_results_for_viz
+from drake import lcmt_viewer_draw, lcmt_contact_results_for_viz
 from bot_core import robot_state_t
 from robotlocomotion import robot_plan_t, plan_status_t
 from operator import sub
@@ -120,7 +120,7 @@ class BhpnDrakeInterface:
         self.fixed_objects = ['drake_table1', 'drake_table2']
         initial_robot_pose = '0 0 0 0 0 0'
         initial_robot_joint_positions = ''
-        for joint in self.robot_connection.get_drake_robot_conf(self.bhpn_robot_conf).joint_position:
+        for joint in self.robot_connection.interpolate_drake_robot_confs(self.bhpn_robot_conf, self.bhpn_robot_conf)[0].joint_position:
             initial_robot_joint_positions += str(joint) + ' '
         objects = []
         for object_name, object_type in self.object_types.items():
@@ -240,7 +240,7 @@ class BhpnDrakeInterface:
             self.lc.handle()
 
     def robot_conf_callback(self, channel, data):
-        self.drake_robot_conf = lcmt_robot_state.decode(data)
+        self.drake_robot_conf = robot_state_t.decode(data)
         self.bhpn_robot_conf = self.robot_connection.get_bhpn_robot_conf(self.drake_robot_conf)
      
     def object_pose_callback(self, channel, data):

@@ -11,7 +11,6 @@
 #include "drake/examples/bhpn_drake_interface/src/simulators/valkyrie/valkyrie_world_diagram.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/lcmt_contact_results_for_viz.hpp"
-#include "drake/lcmt_robot_state.hpp"
 #include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/systems/analysis/implicit_euler_integrator.h"

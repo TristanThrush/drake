@@ -8,7 +8,7 @@
 #include "drake/examples/bhpn_drake_interface/src/utils/bdisc_parser.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/lcmt_contact_results_for_viz.hpp"
-#include "drake/lcmt_robot_state.hpp"
+#include "lcmtypes/bot_core/robot_state_t.hpp"
 #include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
@@ -89,7 +89,7 @@ void main(int argc, char* argv[]) {
   
   // Set up communication with BHPN.
   auto robot_state_pub = diagram_builder.AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_robot_state>("ROBOT_STATE",
+      systems::lcm::LcmPublisherSystem::Make<bot_core::robot_state_t>("ROBOT_STATE",
                                                                &lcm));
   robot_state_pub->set_name("robot_state_publisher");
 

@@ -7,7 +7,7 @@
 
 #include "drake/common/drake_copyable.h"
 #include "drake/common/eigen_types.h"
-#include "drake/lcmt_robot_state.hpp"
+#include "lcmtypes/bot_core/robot_state_t.hpp"
 #include "drake/systems/framework/leaf_system.h"
 
 namespace drake {
@@ -54,11 +54,11 @@ class RobotStateSender : public systems::LeafSystem<double> {
 
  private:
   // This is the method to use for the output port allocator.
-  lcmt_robot_state MakeOutputStatus() const;
+  bot_core::robot_state_t MakeOutputStatus() const;
 
   // This is the calculator method for the output port.
   void OutputStatus(const systems::Context<double>& context,
-                    lcmt_robot_state* output) const;
+                    bot_core::robot_state_t* output) const;
 
   const int num_joints_;
 };

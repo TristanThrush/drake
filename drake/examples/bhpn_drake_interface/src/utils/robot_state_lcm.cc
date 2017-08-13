@@ -1,7 +1,7 @@
 #include "drake/examples/bhpn_drake_interface/src/utils/robot_state_lcm.h"
 
 #include "drake/common/drake_assert.h"
-#include "drake/lcmt_robot_state.hpp"
+#include "lcmtypes/bot_core/robot_state_t.hpp"
 
 namespace drake {
 namespace examples {
@@ -39,7 +39,7 @@ void RobotStateReceiver::DoCalcDiscreteVariableUpdates(
     DiscreteValues<double>* discrete_state) const {
   const systems::AbstractValue* input = this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(input != nullptr);
-  const auto& command = input->GetValue<lcmt_robot_state>();
+  const auto& command = input->GetValue<bot_core::robot_state_t>();
 
   // If we're using a default constructed message (haven't received
   // a command yet), keep using the initial state.
@@ -71,21 +71,21 @@ RobotStateSender::RobotStateSender(int num_joints) : num_joints_(num_joints) {
                                   &RobotStateSender::OutputStatus);
 }
 
-lcmt_robot_state RobotStateSender::MakeOutputStatus() const {
-  lcmt_robot_state msg{};
+bot_core::robot_state_t RobotStateSender::MakeOutputStatus() const {
+  bot_core::robot_state_t msg{};
   msg.num_joints = num_joints_;
   msg.joint_position.resize(msg.num_joints, 0);
-  msg.joint_robot.resize(msg.num_joints, 0);
   msg.joint_name.resize(msg.num_joints, "");
   msg.joint_velocity.resize(msg.num_joints, 0);
+  msg.joint_effort.resize(msg.num_joints, 0);
   return msg;
 }
 
 void RobotStateSender::OutputStatus(const Context<double>& context,
-                                    lcmt_robot_state* output) const {
-  lcmt_robot_state& status = *output;
+                                    bot_core::robot_state_t* output) const {
+  bot_core::robot_state_t& status = *output;
 
-  status.timestamp = context.get_time() * 1e6;
+  status.utime = context.get_time() * 1e6;
   const systems::BasicVector<double>* state = this->EvalVectorInput(context, 1);
   for (int i = 0; i < num_joints_; ++i) {
     status.joint_position[i] = state->GetAtIndex(i);

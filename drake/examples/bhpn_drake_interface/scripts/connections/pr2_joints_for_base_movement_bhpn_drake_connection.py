@@ -6,7 +6,7 @@ import threading
 from geometry import shapes, hu
 from robot import conf
 import lcm
-from drake import lcmt_robot_state, lcmt_viewer_draw, lcmt_contact_results_for_viz
+from drake import robot_state_t, lcmt_viewer_draw, lcmt_contact_results_for_viz
 from bot_core import robot_state_t
 from robotlocomotion import robot_plan_t
 from operator import sub
@@ -41,14 +41,17 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         return self.bhpn_robot_conf.copy()
 
     def get_drake_robot_conf(self, bhpn_robot_conf):
-        msg = lcmt_robot_state()
-        msg.timestamp = time.time() * 1000000
+        # Right now, it only uses the joint positions part of the state
+        # message, but there is support for alot more info if needed.
+        
+        msg = robot_state_t
+        msg.utime = time.time() * 1000000
         msg.num_joints = self.num_joints
+        msg.joint_name = self.get_joint_list_names()
         msg.joint_position = self.get_joint_list(bhpn_robot_conf)
-        msg.joint_robot = [0] * msg.num_joints
-        msg.joint_name = [''] * msg.num_joints
-        msg.joint_velocity = [0.0] * msg.num_joints
-        print 'msg: ', msg
+        msg.joint_velocity = [0]*msg.num_joints
+        msg.joint_effort = [0]*msg.num_joints
+
         return msg
  
     def get_joint_list(self, bhpn_robot_conf):
