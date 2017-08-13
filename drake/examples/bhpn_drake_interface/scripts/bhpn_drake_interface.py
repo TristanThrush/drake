@@ -12,11 +12,11 @@ from operator import sub
 import time
 import atexit
 import math
-import pydrake
 import numpy as np
 import subprocess
 import signal
 from pr2_joints_for_base_movement_bhpn_drake_connection import Pr2JointsForBaseMovementBhpnDrakeConnection
+from valkyrie_bhpn_drake_connection import ValkyrieBhpnDrakeConnection
 
 drake_path = '/Users/tristanthrush/research/mit/drake/'
 interface_path = 'drake/examples/bhpn_drake_interface/'
@@ -25,7 +25,7 @@ interface_path_absolute = drake_path + interface_path
 interface_build_path_absolute = drake_path + interface_build_path
 
 supported_object_types = {'drake_table': interface_path + 'objects/drake_table.sdf', 'drake_soda': interface_path + 'objects/drake_soda.urdf'}
-supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator')}
+supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator'), 'valkyrie': (ValkyrieBhpnDrakeConnection, 'valkyrie_simulator')}
 
 class BhpnDrakeInterface:
 
@@ -120,7 +120,7 @@ class BhpnDrakeInterface:
         self.fixed_objects = ['drake_table1', 'drake_table2']
         initial_robot_pose = '0 0 0 0 0 0'
         initial_robot_joint_positions = ''
-        for joint in self.robot_connection.interpolate_drake_robot_confs(self.bhpn_robot_conf, self.bhpn_robot_conf)[0].joint_position:
+        for joint in self.robot_connection.interpolate_drake_robot_confs([self.bhpn_robot_conf])[0].joint_position:
             initial_robot_joint_positions += str(joint) + ' '
         objects = []
         for object_name, object_type in self.object_types.items():
@@ -153,22 +153,15 @@ class BhpnDrakeInterface:
 
     ######### Simulation command methods ######################################
 
-    def encode_drake_robot_plan(self, bhpn_robot_path, time):
-        assert len(time) == len(bhpn_robot_path)
+    def encode_drake_robot_plan(self, bhpn_robot_confs, time_spacing):
+        drake_confs = self.robot_connection.interpolate_drake_robot_confs(bhpn_robot_confs, time_spacing)
         plan = robot_plan_t()
         plan.utime = 0
         plan.robot_name = self.robot_type 
-        plan.num_states = len(time)
+        plan.num_states = len(drake_confs)
         plan.plan_info = [1]*plan.num_states 
         last_joint_values_on_path = self.drake_robot_conf.joint_position 
-        for index in range(len(bhpn_robot_path)):
-            state = robot_state_t()
-            state.utime = time[index]
-            state.num_joints = self.robot_connection.get_num_joints()
-            state.joint_name = self.robot_connection.get_joint_list_names()
-            state.joint_position = self.robot_connection.get_joint_list(bhpn_robot_path[index])
-            state.joint_velocity = [0]*state.num_joints
-            state.joint_effort = [0]*state.num_joints
+        for state in drake_confs:
             # Modify the plan so that drake wont stupidly take the long way from 0 to 2 pi for continuous joints.
             for continuous_joint_index in self.robot_connection.get_drake_continuous_joint_indices():
                 if state.joint_position[continuous_joint_index] - last_joint_values_on_path[continuous_joint_index] > math.pi:

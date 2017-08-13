@@ -31,14 +31,10 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
     # y, theta values will need to first be passed to a walking plannner in
     # drake to yield the correct lower body joint values for the controller.
 
-    # TODO: this class remains unfinished because it is dependent on the drake
-    # IK and gripper transform problems being resolved. Fix those, then fix 
-    # this.
-
     def __init__(self, bhpn_robot_conf):
         RobotBhpnDrakeConnection.__init__(self, bhpn_robot_conf)
         self.robot_type = 'valkyrie'
-        self.num_joints = 22
+        self.num_drake_joints = 40
 
     def get_bhpn_robot_conf(self, drake_robot_conf):
         drake_joints = drake_robot_conf.joint_position
@@ -52,34 +48,26 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
             self.bhpn_robot_conf = self.bhpn_robot_conf.set(k, list(v))
         return self.bhpn_robot_conf.copy()
 
-    def interpolate_drake_robot_confs(self, bhpn_robot_conf_start, bhpn_robot_conf_end):
-        return self.get_valkyrie_plan(bhpn_robot_conf_start, bhpn_robot_conf_end)
+    def interpolate_drake_robot_confs(self, bhpn_robot_confs, time_spacing=100000):
 
-    def get_valkyrie_plan(self, bhpn_robot_conf_start, bhpn_robot_conf_end):
-        
-        msg1 = lcmt_robot_state()
-        msg1.timestamp = time.time() * 1000000
-        msg1.num_joints = self.num_joints
-        msg1.joint_position = self.get_joint_list(bhpn_robot_conf)
-        msg1.joint_robot = [0] * msg1.num_joints
-        msg1.joint_name = [''] * msg1.num_joints
-        msg1.joint_velocity = [0.0] * msg1.num_joints
+        drake_robot_confs = []
+        utime = time_spacing
+        for bhpn_robot_conf in bhpn_robot_confs:
+            state = robot_state_t()
+            state.utime = utime
+            state.num_joints = self.num_drake_joints
+            state.joint_name = self.get_joint_list_names()
+            state.joint_position = [0]*9 + self.get_joint_list_only_bhpn_joints(bhpn_robot_conf)[:15] + [0, 0, -0.49, 1.205, -0.71, 0, 0, 0, -0.49, 1.205, -0.71, 0] + get_joint_list_only_bhpn_joints(bhpn_robot_conf)[15:]
+            state.joint_velocity = [0]*state.num_drake_joints
+            state.joint_effort = [0]*state.num_drake_joints
+            drake_robot_confs.append(state)
+            utime += time_spacing
+        return drake_robot_confs
 
-        msg2 = lcmt_robot_state()
-        msg2.timestamp = time.time() * 1000000
-        msg2.num_joints = self.num_joints
-        msg2.joint_position = self.get_joint_list(bhpn_robot_conf)
-        msg2.joint_robot = [0] * msg1.num_joints
-        msg2.joint_name = [''] * msg1.num_joints
-        msg2.joint_velocity = [0.0] * msg1.num_joints
-
-        return msg
-
-    def get_joint_list(self, bhpn_robot_conf):
-        return bhpn_robot_conf['robotBase']\
-            + bhpn_robot_conf['robotLeftArm']\
+    def get_joint_list_only_bhpn_joints(self, bhpn_robot_conf):
+        return bhpn_robot_conf['robotHead']\
             + bhpn_robot_conf['robotRightArm']\
-            + bhpn_robot_conf['robotHead']\
+            + bhpn_robot_conf['robotLeftArm']\
             + bhpn_robot_conf['robotLeftGripper']\
             + bhpn_robot_conf['robotRightGripper']
 
@@ -87,14 +75,14 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
         return [
             'x',
             'y',
-            'theta',
-            'leftShoulderPitch',
-            'leftShoulderRoll',
-            'leftShoulderYaw',
-            'leftElbowPitch',
-            'leftForearmYaw',
-            'leftWristTopActuator',
-            'leftWristBottomActuator',
+            'z',
+            'roll',
+            'pitch',
+            'yaw',
+            'torsoYaw',
+            'waistLeftActuator',
+            'waistRightActuator',
+            'lowerNeckPitch',
             'rightShoulderPitch',
             'rightShoulderRoll',
             'rightShoulderYaw',
@@ -102,14 +90,29 @@ class ValkyrieBhpnDrakeConnection(RobotBhpnDrakeConnection):
             'rightForearmYaw',
             'rightWristTopActuator',
             'rightWristBottomActuator',
-            'lowerNeckPitch',
+            'leftShoulderPitch',
+            'leftShoulderRoll',
+            'leftShoulderYaw',
+            'leftElbowPitch',
+            'leftForearmYaw',
+            'leftWristTopActuator',
+            'leftWristBottomActuator',
+            'rightHipYaw',
+            'rightHipRoll',
+            'rightHipPitch',
+            'rightKneePitch',
+            'rightAnkleInsideActuator',
+            'rightAnkleOutsideActuator',
+            'leftHipYaw',
+            'leftHipRoll',
+            'leftHipPitch',
+            'leftKneePitch',
+            'leftAnkleInsideActuator',
+            'leftAnkleOutsideActuator',
             'leftThumbPitch1Actuator',
             'leftMiddleFingerPitch1Actuator',
             'rightThumbPitch1Actuator',
             'rightMiddleFingerPitch1Actutor']
-
-    def get_num_joints(self):
-        return self.num_joints
 
     def get_hands_to_end_effectors(self):
         return {'left': 'leftPalm', 'right': 'rightPalm'}

@@ -6,14 +6,13 @@ import threading
 from geometry import shapes, hu
 from robot import conf
 import lcm
-from drake import robot_state_t, lcmt_viewer_draw, lcmt_contact_results_for_viz
+from drake import lcmt_viewer_draw, lcmt_contact_results_for_viz
 from bot_core import robot_state_t
 from robotlocomotion import robot_plan_t
 from operator import sub
 import time
 import atexit
 import math
-import pydrake
 import numpy as np
 import subprocess
 import signal
@@ -40,19 +39,22 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
             self.bhpn_robot_conf = self.bhpn_robot_conf.set(k, list(v))
         return self.bhpn_robot_conf.copy()
 
-    def get_drake_robot_conf(self, bhpn_robot_conf):
+    def interpolate_drake_robot_confs(self, bhpn_robot_confs, time_spacing=100000):
         # Right now, it only uses the joint positions part of the state
         # message, but there is support for alot more info if needed.
-        
-        msg = robot_state_t
-        msg.utime = time.time() * 1000000
-        msg.num_joints = self.num_joints
-        msg.joint_name = self.get_joint_list_names()
-        msg.joint_position = self.get_joint_list(bhpn_robot_conf)
-        msg.joint_velocity = [0]*msg.num_joints
-        msg.joint_effort = [0]*msg.num_joints
-
-        return msg
+        drake_robot_confs = []
+        utime = time_spacing
+        for bhpn_robot_conf in bhpn_robot_confs:
+            state = robot_state_t()
+            state.utime = utime
+            state.num_joints = self.num_joints
+            state.joint_name = self.get_joint_list_names()
+            state.joint_position = self.get_joint_list(bhpn_robot_conf)
+            state.joint_velocity = [0]*state.num_joints
+            state.joint_effort = [0]*state.num_joints
+            drake_robot_confs.append(state)
+            utime += time_spacing
+        return drake_robot_confs
  
     def get_joint_list(self, bhpn_robot_conf):
         return bhpn_robot_conf['pr2Base']\
@@ -65,10 +67,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
 
     def get_joint_list_names(self):
         return ['x', 'y', 'theta', 'torso_lift_joint', 'head_pan_joint', 'head_tilt_joint', 'r_shoulder_pan_joint', 'r_shoulder_lift_joint', 'r_upper_arm_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'r_gripper_l_finger_tip_joint', 'r_gripper_r_finger_tip_joint', 'l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint', 'l_gripper_l_finger_joint', 'l_gripper_r_finger_joint', 'l_gripper_l_finger_tip_joint', 'l_gripper_r_finger_tip_joint']
-    
-    def get_num_joints(self):
-        return self.num_joints
-
+  
     def get_hands_to_end_effectors(self):
         return {'left':'l_gripper_palm_link', 'right':'r_gripper_palm_link'}
     
@@ -133,7 +132,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         
         # Compute and do the path, given those waypoints
         path = rrt.interpolatePath([bhpn_drake_interface_obj.get_bhpn_robot_conf(), start_conf_open, target_conf_open, n_conf, n_conf_closed, start_conf_closed], 0.01)
-        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
+        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, step_time)
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
         
         return bhpn_drake_interface_obj.is_gripped(hand, obj)
@@ -153,7 +152,7 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         target_conf_open = target_conf.set(target_conf.robot.gripperChainNames[hand], [width_open])
         path += [target_conf_open, target_conf_open, target_conf_open, target_conf_open]
 
-        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, [step*step_time for step in range(len(path))])
+        plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, step_time)
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
         
         return not bhpn_drake_interface_obj.is_gripped(hand, obj)

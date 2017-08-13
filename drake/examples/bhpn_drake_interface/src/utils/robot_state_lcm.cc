@@ -73,11 +73,40 @@ RobotStateSender::RobotStateSender(int num_joints) : num_joints_(num_joints) {
 
 bot_core::robot_state_t RobotStateSender::MakeOutputStatus() const {
   bot_core::robot_state_t msg{};
+
+  msg.utime = 0;
+  msg.pose.translation.x = 0 ;
+  msg.pose.translation.y = 0 ;
+  msg.pose.translation.z = 0 ;
+  msg.pose.rotation.x = 0;
+  msg.pose.rotation.y = 0;
+  msg.pose.rotation.z = 0;
+  msg.twist.linear_velocity.x = 0;
+  msg.twist.linear_velocity.y = 0;
+  msg.twist.linear_velocity.z = 0;
+  msg.twist.angular_velocity.x = 0;
+  msg.twist.angular_velocity.y = 0;
+  msg.twist.angular_velocity.z = 0;
+
   msg.num_joints = num_joints_;
-  msg.joint_position.resize(msg.num_joints, 0);
   msg.joint_name.resize(msg.num_joints, "");
+  msg.joint_position.resize(msg.num_joints, 0);
   msg.joint_velocity.resize(msg.num_joints, 0);
   msg.joint_effort.resize(msg.num_joints, 0);
+
+  msg.force_torque.l_foot_force_z = 0;
+  msg.force_torque.l_foot_torque_x = 0;
+  msg.force_torque.l_foot_torque_y = 0;
+  msg.force_torque.r_foot_force_z = 0;
+  msg.force_torque.r_foot_torque_x = 0;
+  msg.force_torque.r_foot_torque_y = 0;
+  for (int i = 0; i < 3; ++i) {
+    msg.force_torque.l_hand_force[i] = 0;
+    msg.force_torque.l_hand_torque[i] = 0;
+    msg.force_torque.r_hand_force[i] = 0;
+    msg.force_torque.r_hand_torque[i] = 0;
+  }
+
   return msg;
 }
 
