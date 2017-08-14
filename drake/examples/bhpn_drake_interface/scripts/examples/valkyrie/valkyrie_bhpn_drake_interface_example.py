@@ -11,7 +11,7 @@ import time
 
 robot_type = 'valkyrie'
 bhpn_robot_conf = makeRobot(np.array([(-1.0, -3.0, 0.0), (3.0, 3.0, 2.0)])).nominalConf
-bhpn_robot_conf = bhpn_robot_conf.set('robotRightArm', [-0.2, 1.25, 0, 0.9, 1.571, 0, 0])
+bhpn_robot_conf = bhpn_robot_conf.set('robotRightArm', [0.3, 1.25, 0, 0.9, 1.571, 0, 0])
 bhpn_robot_conf = bhpn_robot_conf.set('robotLeftArm', [0.3, -1.25, 0, -0.785, 1.571, 0, 0])
 bhpn_robot_conf = bhpn_robot_conf.set('robotLeftGripper', [0])
 bhpn_robot_conf = bhpn_robot_conf.set('robotRightGripper', [0])
@@ -27,10 +27,13 @@ print 'Sending example plan'
 
 # Make an example BHPN motion plan that picks and places an object.
 bhpn_motion_plan = []
+for index in range(6):
+    bhpn_robot_conf = bhpn_robot_conf.set('robotRightArm', [0.3 - index*0.095, 1.25, 0, 0.9, 1.571, 0, 0])
+    bhpn_motion_plan.append(bhpn_robot_conf)
 for index in range(15):
     bhpn_robot_conf = bhpn_robot_conf.set('robotRightGripper', [-index*0.1])
     bhpn_motion_plan.append(bhpn_robot_conf)
-for index in range(5):
+for index in range(8):
     bhpn_robot_conf = bhpn_robot_conf.set('robotRightArm', [-0.2 - index*0.1, 1.25, 0, 0.9, 1.571, 0, 0])
     bhpn_motion_plan.append(bhpn_robot_conf)
 

@@ -27,6 +27,8 @@ interface_build_path_absolute = drake_path + interface_build_path
 supported_object_types = {'drake_table': interface_path + 'objects/drake_table.sdf', 'drake_soda': interface_path + 'objects/drake_soda.urdf'}
 supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator', 'ROBOT_PLAN', 'ROBOT_STATE'), 'valkyrie': (ValkyrieBhpnDrakeConnection, 'valkyrie_simulator', 'VALKYRIE_MANIP_PLAN', 'EST_ROBOT_STATE')}
 
+fun_colors = {'drake_soda1': 'drake_soda_salmon', 'drake_soda2': 'drake_soda_blue'}
+
 class BhpnDrakeInterface:
 
     def __init__(
@@ -85,7 +87,6 @@ class BhpnDrakeInterface:
             time.sleep(0.1)
 
         atexit.register(self.release)
-        print 'gripped: ', self.is_gripped('right', 'drake_soda')
         print 'Initialized the BHPN-Drake Interface.'
 
     ############# Initialization/Destruction methods ##########################
@@ -103,7 +104,10 @@ class BhpnDrakeInterface:
         print 'Terminated the BHPN-Drake Interface.'
 
     def generate_description_for_object_name(self, object_name, object_type):
-        type_description_path = drake_path + supported_object_types[object_type]
+        fun_color_replacement_type = object_type
+        if object_name in fun_colors:
+            fun_color_replacement_type = fun_colors[object_name]
+        type_description_path = drake_path + supported_object_types[object_type].replace(object_type, fun_color_replacement_type)
         type_description = open(type_description_path, 'r')
         text = type_description.read()
         type_description.close()
@@ -114,10 +118,10 @@ class BhpnDrakeInterface:
         name_description.write(text)
         name_description.close()
         self.generated_description_paths.append(name_description_path)
-        return supported_object_types[object_type].replace(object_type, object_name).replace('objects', 'tmp')
+        return supported_object_types[object_type].replace(object_type, fun_color_replacement_type).replace(object_type, object_name).replace('objects', 'tmp')
 
     def create_bdisc(self):
-        self.fixed_objects = ['drake_table1', 'drake_table2']
+        self.fixed_objects = ['drake_table', 'drake_table1', 'drake_table2']
         initial_robot_pose = '0 0 0 0 0 0'
         initial_robot_joint_positions = ''
         for joint in self.robot_connection.interpolate_drake_robot_confs([self.bhpn_robot_conf])[0].joint_position:
