@@ -99,7 +99,7 @@ void main(int argc, char* argv[]) {
 
   auto plan_receiver = diagram_builder.AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<robotlocomotion::robot_plan_t>(
-          "ROBOT_PLAN", &lcm));
+          "PR2_PLAN", &lcm));
   plan_receiver->set_name("plan_receiver");
 
   auto command_injector = diagram_builder.AddSystem<RobotPlanInterpolator>(

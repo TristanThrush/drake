@@ -25,7 +25,7 @@ interface_path_absolute = drake_path + interface_path
 interface_build_path_absolute = drake_path + interface_build_path
 
 supported_object_types = {'drake_table': interface_path + 'objects/drake_table.sdf', 'drake_soda': interface_path + 'objects/drake_soda.urdf'}
-supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator', 'ROBOT_PLAN', 'ROBOT_STATE'), 'valkyrie': (ValkyrieBhpnDrakeConnection, 'valkyrie_simulator', 'VALKYRIE_MANIP_PLAN', 'EST_ROBOT_STATE')}
+supported_robot_types = {'pr2': (Pr2JointsForBaseMovementBhpnDrakeConnection, 'pr2_simulator', 'PR2_PLAN', 'ROBOT_STATE'), 'valkyrie': (ValkyrieBhpnDrakeConnection, 'valkyrie_simulator', 'VALKYRIE_MANIP_PLAN', 'EST_ROBOT_STATE')}
 
 fun_colors = {'drake_soda1': 'drake_soda_salmon', 'drake_soda2': 'drake_soda_blue'}
 
