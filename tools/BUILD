@@ -31,6 +31,7 @@ sh_binary(
     }),
     data = [
         "//drake/bindings:pydrake",
+        "//drake/examples/valkyrie:prod_models",
         "@director",
     ],
 )

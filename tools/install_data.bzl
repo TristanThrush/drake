@@ -33,6 +33,8 @@ def install_data(
         "urdf",
         "xml",
         "dae",
+        "vtp",
+        "vtm",
     ]
     exclude_patterns = ["**/test/*", "**/test*"]
     prod_models_include = ["**/*.{}".format(x) for x in models_extensions]

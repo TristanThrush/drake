@@ -44,7 +44,7 @@ class ValkyrieSimulationDiagram : public systems::Diagram<double> {
     drake::parsers::urdf::AddModelInstanceFromUrdfFile(
         FindResourceOrThrow(
             "drake/examples/valkyrie/urdf/urdf/"
-            /*"valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf"*/ "valkyrie.urdf"),
+            "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf"),
         multibody::joints::kRollPitchYaw, nullptr /* weld to frame */,
         tree_ptr.get());
     multibody::AddFlatTerrainToWorld(tree_ptr.get(), 100., 10.);
