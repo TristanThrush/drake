@@ -135,7 +135,13 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
         plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, step_time)
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
         
-        return bhpn_drake_interface_obj.is_gripped(hand, obj)
+        # Account for some false negatives
+        for index in range(10):
+            if bhpn_drake_interface_obj.is_gripped(hand, obj):
+                return True
+            time.sleep(.1)
+
+        return False
 
     def place(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj, timeout=60):
         # Basic placing procedure. Not really that reactive (except it does ensure that the object is not gripped). Can easily be made more reactive by taking more advantage of bhpn_drake_interface_obj's data from drake.
@@ -154,9 +160,14 @@ class Pr2JointsForBaseMovementBhpnDrakeConnection(RobotBhpnDrakeConnection):
 
         plan = bhpn_drake_interface_obj.encode_drake_robot_plan(path, step_time)
         bhpn_drake_interface_obj.command_drake_robot_plan(plan)
-        
-        return not bhpn_drake_interface_obj.is_gripped(hand, obj)
 
+        # Account for some false positives
+        for index in range(10):
+            if not bhpn_drake_interface_obj.is_gripped(hand, obj):
+                return True
+            time.sleep(.1)
+        
+        return False
 
 def displaceHand(conf, hand, dx=0.0, dy=0.0, dz=0.0,
                  zFrom=None, maxTarget=None, nearTo=None):
