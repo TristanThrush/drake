@@ -70,10 +70,9 @@ class BhpnDrakeInterface:
         # Start the lcm subscribers that listen to the drake simulatiuon for information.
         self.lc = lcm.LCM()
         self.lc.subscribe(supported_robot_types[self.robot_type][3], self.robot_conf_callback)
-        self.lc.subscribe('DRAKE_VIEWER_DRAW', self.object_pose_callback)
-        self.lc.subscribe('CONTACT_RESULTS', self.contact_results_callback)
-        self.lc.subscribe('PLAN_STATUS', self.plan_status_callback)
-        self.handler_poison_pill = False
+        self.drake_viewer_draw_subscription = self.lc.subscribe('DRAKE_VIEWER_DRAW', self.object_pose_callback)
+        self.contact_results_subscription = self.lc.subscribe('CONTACT_RESULTS', self.contact_results_callback)
+        self.plan_status_subscription = self.lc.subscribe('PLAN_STATUS', self.plan_status_callback)
         self.callback_handler = threading.Thread(target=self.handle_lcm_subscribers)
         self.callback_handler.daemon = True
         self.callback_handler.start()
@@ -93,20 +92,19 @@ class BhpnDrakeInterface:
 
     def release(self):
         print 'Attempting to terminate the BHPN-Drake Interface.'
+        self.drake_simulation.terminate()
+        return_code = self.drake_simulation.wait()
+        print 'Terminated the Drake simulation. Return code of the Drake simulation: ', return_code
         for path in self.generated_description_paths:
             os.system('rm ' + path)
         os.system('rm ' + interface_path_absolute + 'tmp/simulator_conf.bdisc')
-        self.handler_poison_pill = True
-        self.callback_handler.join()
-        self.drake_simulation.terminate()
-        return_code = self.drake_simulation.wait()
-        print 'Return code of the Drake simulation: ', return_code
+        print "Removed temporary objects."
         print 'Terminated the BHPN-Drake Interface.'
 
     def generate_description_for_object_name(self, object_name, object_type):
         fun_color_replacement_type = object_type
         if object_name in fun_colors:
-            fun_color_replacement_type = fun_colors[object_name]
+            fun_color_replacement_tyIpe = fun_colors[object_name]
         type_description_path = drake_path + supported_object_types[object_type].replace(object_type, fun_color_replacement_type)
         type_description = open(type_description_path, 'r')
         text = type_description.read()
@@ -234,7 +232,7 @@ class BhpnDrakeInterface:
     ######### LCM methods #####################################################
 
     def handle_lcm_subscribers(self):
-        while not self.handler_poison_pill:
+        while True:
             self.lc.handle()
 
     def robot_conf_callback(self, channel, data):
