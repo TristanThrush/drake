@@ -17,7 +17,7 @@ class RobotBhpnDrakeConnection:
 
     def get_hands_to_end_effectors(self):
         raise NotImplementedError
-    
+
     def get_drake_continuous_joint_indices(self):
         raise NotImplementedError
 
@@ -27,8 +27,20 @@ class RobotBhpnDrakeConnection:
     def maintain_pick_conf(self, bhpn_robot_conf, hand):
         raise NotImplementedError
 
-    def pick(self, start_conf, targe_conf, hand, obj, bhpn_drake_interface_obj):
+    def pick(
+            self,
+            start_conf,
+            targe_conf,
+            hand,
+            obj,
+            bhpn_drake_interface_obj):
         raise NotImplementedError
 
-    def place(self, start_conf, target_conf, hand, obj, bhpn_drake_interface_obj):
+    def place(
+            self,
+            start_conf,
+            target_conf,
+            hand,
+            obj,
+            bhpn_drake_interface_obj):
         raise NotImplementedError

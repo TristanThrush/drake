@@ -1,0 +1,5 @@
+0 0 0 0 0 0
+0.0 0.0 0.0 0.3 0.0 0.0 -1.1431735754 1.10992264748 -1.39999997616 -2.10636425018 -1.33473062515 -1.11648333073 2.19078660011 0.49 0.49 0.49 0.49 2.1 1.29 0.0 -0.15 0.0 -0.1 0.0 0.15 0.15 0.15 0.15 
+drake_table2 drake/examples/bhpn_drake_interface/tmp/drake_table2.sdf 0.0 2.0 0.38225 0 0 0.0 true 
+drake_table1 drake/examples/bhpn_drake_interface/tmp/drake_table1.sdf 2.0 0.0 0.38225 0 0 0.0 true 
+drake_soda drake/examples/bhpn_drake_interface/objects/drake_soda.urdf 1.8 0.3 0.83 0 0 -0.3 false 
