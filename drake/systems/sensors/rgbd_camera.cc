@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -34,6 +35,8 @@
 #endif
 
 #include "drake/math/roll_pitch_yaw.h"
+#include "drake/systems/framework/diagram_builder.h"
+#include "drake/systems/primitives/zero_order_hold.h"
 #include "drake/systems/rendering/pose_vector.h"
 #include "drake/systems/sensors/camera_info.h"
 #include "drake/systems/sensors/image.h"
@@ -63,12 +66,9 @@ const int kPortStateInput = 0;
 const double kClippingPlaneNear = 0.01;
 const double kClippingPlaneFar = 100.;
 
-// TODO(kunimatsu-tri) Add support for the arbitrary image size and the depth
-// ranges.
+// TODO(kunimatsu-tri) Add support for the arbitrary image size.
 const int kImageWidth = 640;  // In pixels
 const int kImageHeight = 480;  // In pixels
-const float kDepthRangeNear = 0.5;
-const float kDepthRangeFar = 5.0;
 const double kTerrainSize = 100.;
 
 // For Zbuffer value conversion.
@@ -247,15 +247,17 @@ void RgbdCamera::ConvertDepthImageToPointCloud(const ImageDepth32F& depth_image,
 class RgbdCamera::Impl : private ModuleInitVtkRenderingOpenGL2 {
  public:
   Impl(const RigidBodyTree<double>& tree, const RigidBodyFrame<double>& frame,
+       double depth_range_near, double depth_range_far,
        double fov_y, bool show_window, bool fix_camera);
 
   Impl(const RigidBodyTree<double>& tree, const RigidBodyFrame<double>& frame,
        const Eigen::Vector3d& position, const Eigen::Vector3d& orientation,
+       double depth_range_near, double depth_range_far,
        double fov_y, bool show_window, bool fix_camera);
 
   ~Impl() {}
 
-  static float CheckRangeAndConvertToMeters(float z_buffer_value);
+  float CheckRangeAndConvertToMeters(float z_buffer_value) const;
 
   const Eigen::Isometry3d& color_camera_optical_pose() const {
     return X_BC_;
@@ -302,6 +304,8 @@ class RgbdCamera::Impl : private ModuleInitVtkRenderingOpenGL2 {
   const Eigen::Isometry3d X_BC_;
   const Eigen::Isometry3d X_BD_;
   const Eigen::Isometry3d X_WB_initial_;
+  const double depth_range_near_;
+  const double depth_range_far_;
   const bool kCameraFixed;
   ColorPalette color_palette_;
   vtkNew<vtkActor> terrain_actor_;
@@ -328,6 +332,7 @@ RgbdCamera::Impl::Impl(const RigidBodyTree<double>& tree,
                        const RigidBodyFrame<double>& frame,
                        const Eigen::Vector3d& position,
                        const Eigen::Vector3d& orientation,
+                       double depth_range_near, double depth_range_far,
                        double fov_y, bool show_window, bool fix_camera)
     : tree_(tree), frame_(frame),
       color_camera_info_(kImageWidth, kImageHeight, fov_y),
@@ -347,7 +352,12 @@ RgbdCamera::Impl::Impl(const RigidBodyTree<double>& tree,
       X_WB_initial_(
           Eigen::Translation3d(position[0], position[1], position[2]) *
           Eigen::Isometry3d(math::rpy2rotmat(orientation))),
+      depth_range_near_(depth_range_near), depth_range_far_(depth_range_far),
       kCameraFixed(fix_camera), color_palette_(tree.bodies.size()) {
+  DRAKE_DEMAND(depth_range_near_ >= kClippingPlaneNear);
+  DRAKE_DEMAND(depth_range_far_ <= kClippingPlaneFar);
+  DRAKE_DEMAND(depth_range_far_ - depth_range_near_ > 0);
+
   if (!show_window) {
     for (auto& window : MakeVtkPointerArray(color_depth_render_window_,
                                             label_render_window_)) {
@@ -414,9 +424,12 @@ RgbdCamera::Impl::Impl(const RigidBodyTree<double>& tree,
 
 RgbdCamera::Impl::Impl(const RigidBodyTree<double>& tree,
                        const RigidBodyFrame<double>& frame,
+                       double depth_range_near, double depth_range_far,
                        double fov_y, bool show_window, bool fix_camera)
     : Impl::Impl(tree, frame, Eigen::Vector3d(0., 0., 0.),
-                 Eigen::Vector3d(0., 0., 0.), fov_y, show_window, fix_camera) {}
+                 Eigen::Vector3d(0., 0., 0.),
+                 depth_range_near, depth_range_far,
+                 fov_y, show_window, fix_camera) {}
 
 
 void RgbdCamera::Impl::SetModelTransformMatrixToVtkCamera(
@@ -701,7 +714,8 @@ void RgbdCamera::Impl::UpdateModelPoses(
   }
 }
 
-float RgbdCamera::Impl::CheckRangeAndConvertToMeters(float z_buffer_value) {
+float RgbdCamera::Impl::CheckRangeAndConvertToMeters(float z_buffer_value)
+    const {
   float checked_depth;
   // When the depth is either closer than kClippingPlaneNear or further than
   // kClippingPlaneFar, `z_buffer_value` becomes `1.f`.
@@ -710,9 +724,9 @@ float RgbdCamera::Impl::CheckRangeAndConvertToMeters(float z_buffer_value) {
   } else {
     float depth = static_cast<float>(kB / (z_buffer_value - kA));
 
-    if (depth > kDepthRangeFar) {
+    if (depth > depth_range_far_) {
       checked_depth = InvalidDepth::kTooFar;
-    } else if (depth < kDepthRangeNear) {
+    } else if (depth < depth_range_near_) {
       checked_depth = InvalidDepth::kTooClose;
     } else {
       checked_depth = depth;
@@ -727,19 +741,26 @@ RgbdCamera::RgbdCamera(const std::string& name,
                        const RigidBodyTree<double>& tree,
                        const Eigen::Vector3d& position,
                        const Eigen::Vector3d& orientation,
+                       double depth_range_near,
+                       double depth_range_far,
                        double fov_y,
                        bool show_window)
     : impl_(new RgbdCamera::Impl(tree, RigidBodyFrame<double>(), position,
-                                 orientation, fov_y, show_window, true)) {
+                                 orientation, depth_range_near, depth_range_far,
+                                 fov_y, show_window, true)) {
   Init(name);
 }
 
 RgbdCamera::RgbdCamera(const std::string& name,
                        const RigidBodyTree<double>& tree,
                        const RigidBodyFrame<double>& frame,
+                       double depth_range_near,
+                       double depth_range_far,
                        double fov_y,
                        bool show_window)
-    : impl_(new RgbdCamera::Impl(tree, frame, fov_y, show_window, false)) {
+    : impl_(new RgbdCamera::Impl(tree, frame,
+                                 depth_range_near, depth_range_far,
+                                 fov_y, show_window, false)) {
   Init(name);
 }
 
@@ -853,6 +874,46 @@ constexpr float RgbdCamera::InvalidDepth::kTooClose;
 
 constexpr int16_t RgbdCamera::Label::kNoBody;
 constexpr int16_t RgbdCamera::Label::kFlatTerrain;
+
+RgbdCameraDiscrete::RgbdCameraDiscrete(std::unique_ptr<RgbdCamera> camera,
+                                       double period)
+    : camera_(camera.get()), period_(period) {
+  const int width = kImageWidth, height = kImageHeight;
+
+  DiagramBuilder<double> builder;
+  builder.AddSystem(std::move(camera));
+  input_port_state_ = builder.ExportInput(camera_->state_input_port());
+
+  // Color image.
+  const Value<ImageRgba8U> image_color(width, height);
+  const auto* const zoh_color =
+      builder.AddSystem<ZeroOrderHold>(period_, image_color);
+  builder.Connect(camera_->color_image_output_port(),
+                  zoh_color->get_input_port());
+  output_port_color_image_ = builder.ExportOutput(zoh_color->get_output_port());
+
+  // Depth image.
+  const Value<ImageDepth32F> image_depth(width, height);
+  const auto* const zoh_depth =
+      builder.AddSystem<ZeroOrderHold>(period_, image_depth);
+  builder.Connect(camera_->depth_image_output_port(),
+                  zoh_depth->get_input_port());
+  output_port_depth_image_ = builder.ExportOutput(zoh_depth->get_output_port());
+
+  // Label image.
+  const Value<ImageLabel16I> image_label(width, height);
+  const auto* const zoh_label =
+      builder.AddSystem<ZeroOrderHold>(period_, image_label);
+  builder.Connect(camera_->label_image_output_port(),
+                  zoh_label->get_input_port());
+  output_port_label_image_ = builder.ExportOutput(zoh_label->get_output_port());
+
+  // No need to place a ZOH on pose output.
+  output_port_pose_ =
+      builder.ExportOutput(camera_->camera_base_pose_output_port());
+
+  builder.BuildInto(this);
+}
 
 }  // namespace sensors
 }  // namespace systems

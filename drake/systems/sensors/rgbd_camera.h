@@ -9,6 +9,7 @@
 #include "drake/common/drake_copyable.h"
 #include "drake/multibody/rigid_body_frame.h"
 #include "drake/multibody/rigid_body_tree.h"
+#include "drake/systems/framework/diagram.h"
 #include "drake/systems/framework/leaf_system.h"
 #include "drake/systems/rendering/pose_vector.h"
 #include "drake/systems/sensors/camera_info.h"
@@ -130,16 +131,26 @@ class RgbdCamera : public LeafSystem<double> {
   /// @param orientation The roll-pitch-yaw orientation of `B` in `W`. This
   /// defines the orientation component of `X_WB`.
   ///
+  /// @param depth_range_near The minimum depth distance RgbdCamera can measure.
+  /// The default is 0.5 meters.
+  ///
+  /// @param depth_range_far The maximum depth distance RgbdCamera can measure.
+  /// The default is 5 meters.
+  ///
   /// @param fov_y The RgbdCamera's vertical field of view.
+  /// The default is PI / 4.
   ///
   /// @param show_window A flag for showing a visible window.  If this is false,
   /// offscreen rendering is executed. This is useful for debugging purposes.
+  /// The default is true.
   RgbdCamera(const std::string& name,
              const RigidBodyTree<double>& tree,
              const Eigen::Vector3d& position,
              const Eigen::Vector3d& orientation,
-             double fov_y,
-             bool show_window);
+             double depth_range_near = 0.5,
+             double depth_range_far = 5.0,
+             double fov_y = M_PI_4,
+             bool show_window = true);
 
   /// A constructor for %RgbdCamera that defines `B` using a RigidBodyFrame.
   /// The pose of %RgbdCamera is fixed to a user-defined frame and will be
@@ -156,15 +167,25 @@ class RgbdCamera : public LeafSystem<double> {
   ///
   /// @param frame The frame in @tree to which this camera is attached.
   ///
+  /// @param depth_range_near The minimum depth distance RgbdCamera can measure.
+  /// The default is 0.5 meters.
+  ///
+  /// @param depth_range_far The maximum depth distance RgbdCamera can measure.
+  /// The default is 5 meters.
+  ///
   /// @param fov_y The RgbdCamera's vertical field of view.
+  /// The default is PI / 4.
   ///
   /// @param show_window A flag for showing a visible window.  If this is false,
   /// offscreen rendering is executed. This is useful for debugging purposes.
+  /// The default is true.
   RgbdCamera(const std::string& name,
              const RigidBodyTree<double>& tree,
              const RigidBodyFrame<double>& frame,
-             double fov_y,
-             bool show_window);
+             double depth_range_near = 0.5,
+             double depth_range_far = 5.0,
+             double fov_y = M_PI_4,
+             bool show_window = true);
 
   ~RgbdCamera();
 
@@ -225,6 +246,64 @@ class RgbdCamera : public LeafSystem<double> {
 
   class Impl;
   std::unique_ptr<Impl> impl_;
+};
+
+/**
+ * Wraps a continuous RgbdCamera with zero order holds to have it function as
+ * a discrete sensor.
+ */
+class RgbdCameraDiscrete : public systems::Diagram<double> {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(RgbdCameraDiscrete);
+
+  /// Constructs a diagram containing a (non-registered) RgbdCamera that will
+  /// update at a given rate.
+  RgbdCameraDiscrete(std::unique_ptr<RgbdCamera> camera,
+                     double period = 1. / 30);
+
+  /// Returns reference to RgbdCamera intsance.
+  const RgbdCamera& camera() const { return *camera_; }
+
+  /// Returns reference to RgbdCamera intsance.
+  RgbdCamera& mutable_camera() { return *camera_; }
+
+  /// Returns update period for discrete camera.
+  double period() const { return period_; }
+
+  /// @see RgbdCamera::state_input_port().
+  const InputPortDescriptor<double>& state_input_port() const {
+    return get_input_port(input_port_state_);
+  }
+
+  /// @see RgbdCamera::color_image_output_port().
+  const systems::OutputPort<double>& color_image_output_port() const {
+    return get_output_port(output_port_color_image_);
+  }
+
+  /// @see RgbdCamera::depth_image_output_port().
+  const systems::OutputPort<double>& depth_image_output_port() const {
+    return get_output_port(output_port_depth_image_);
+  }
+
+  /// @see RgbdCamera::label_image_output_port().
+  const systems::OutputPort<double>& label_image_output_port() const {
+    return get_output_port(output_port_label_image_);
+  }
+
+  /// @see RgbdCamera::camera_base_pose_output_port().
+  const systems::OutputPort<double>& camera_base_pose_output_port() const {
+    return get_output_port(output_port_pose_);
+  }
+
+ private:
+  RgbdCamera* const camera_{};
+  const double period_{};
+
+  int input_port_state_{-1};
+  int output_port_color_image_{-1};
+  int output_port_depth_image_{-1};
+  int output_port_label_image_{-1};
+  int output_port_pose_{-1};
 };
 
 }  // namespace sensors

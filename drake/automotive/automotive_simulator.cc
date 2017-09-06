@@ -20,6 +20,7 @@
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_plant/create_load_robot_message.h"
+#include "drake/systems/analysis/runge_kutta2_integrator.h"
 #include "drake/systems/framework/basic_vector.h"
 #include "drake/systems/framework/context.h"
 #include "drake/systems/framework/system.h"
@@ -31,6 +32,7 @@ namespace drake {
 
 using maliput::api::Lane;
 using maliput::api::LaneEnd;
+using maliput::api::LaneId;
 using maliput::api::RoadGeometry;
 using maliput::api::RoadGeometryId;
 using multibody::joints::kRollPitchYaw;
@@ -38,6 +40,7 @@ using systems::AbstractValue;
 using systems::lcm::LcmPublisherSystem;
 using systems::OutputPort;
 using systems::rendering::PoseBundle;
+using systems::RungeKutta2Integrator;
 using systems::System;
 using systems::SystemOutput;
 
@@ -333,7 +336,7 @@ const maliput::api::Lane* AutomotiveSimulator<T>::FindLane(
       const maliput::api::Segment* segment = junction->segment(j);
       for (int k = 0; k < segment->num_lanes(); ++k) {
         const maliput::api::Lane* lane = segment->lane(k);
-        if (lane->id().id == name) {
+        if (lane->id() == LaneId(name)) {
           return lane;
         }
       }
@@ -345,7 +348,7 @@ const maliput::api::Lane* AutomotiveSimulator<T>::FindLane(
 
 template <typename T>
 void AutomotiveSimulator<T>::GenerateAndLoadRoadNetworkUrdf() {
-  std::string filename = road_->id().id;
+  std::string filename = road_->id().string();
   std::transform(filename.begin(), filename.end(), filename.begin(),
                  [](char ch) { return ch == ' ' ? '_' : ch; });
   maliput::utility::GenerateUrdfFile(road_.get(),
@@ -494,8 +497,10 @@ void AutomotiveSimulator<T>::Start(double target_realtime_rate) {
   lcm_->StartReceiveThread();
 
   simulator_->set_target_realtime_rate(target_realtime_rate);
-  simulator_->get_mutable_integrator()->set_maximum_step_size(0.01);
-  simulator_->get_mutable_integrator()->set_requested_minimum_step_size(0.01);
+  const double max_step_size = 0.01;
+  simulator_->template reset_integrator<RungeKutta2Integrator<T>>(*diagram_,
+      max_step_size, simulator_->get_mutable_context());
+  simulator_->get_mutable_integrator()->set_fixed_step_mode(true);
   simulator_->Initialize();
 }
 
