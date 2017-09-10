@@ -1,6 +1,3 @@
-[submodule "drake/doc/textbook"]
-	path = drake/doc/textbook
-	url = https://github.com/RussTedrake/underactuated.git
 [submodule "externals/googletest"]
 	path = externals/googletest
 	url = https://github.com/google/googletest.git
@@ -26,9 +23,6 @@
 	path = externals/ipopt
 	url = https://github.com/RobotLocomotion/ipopt-mirror.git
 	ignore = untracked
-[submodule "externals/google_styleguide"]
-	path = externals/google_styleguide
-	url = https://github.com/google/styleguide.git
 [submodule "externals/spdlog"]
 	path = externals/spdlog
 	url = https://github.com/gabime/spdlog.git

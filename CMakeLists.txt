@@ -64,10 +64,6 @@ drake_add_external(googletest PUBLIC CMAKE
     -DBUILD_SHARED_LIBS=ON
     -DCMAKE_INSTALL_NAME_DIR=${CMAKE_INSTALL_PREFIX}/lib)
 
-# google_styleguide
-drake_add_external(google_styleguide PUBLIC PYTHON
-  BUILD_COMMAND :)
-
 # ipopt
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # Work around horrific clang* = clang, */cl* = msvc bug in BuildTools/coin.m4
@@ -121,12 +117,6 @@ drake_add_external(pythonqt CMAKE PYTHON QT
     -DPythonQt_Wrap_Qtgui:BOOL=ON
     -DPythonQt_Wrap_Qtuitools:BOOL=ON
 )
-
-# textbook
-drake_add_external(textbook PUBLIC CMAKE MATLAB PYTHON
-  CMAKE_ARGS -DBUILD_TESTING=${Matlab_FOUND}
-  INSTALL_COMMAND :
-  SOURCE_DIR ${PROJECT_SOURCE_DIR}/drake/doc/textbook)
 
 # tinyobjloader
 drake_add_external(tinyobjloader PUBLIC CMAKE
@@ -189,7 +179,6 @@ drake_add_external(drake LOCAL PUBLIC CMAKE ALWAYS MATLAB PYTHON VTK
     -DWITH_BULLET:BOOL=${WITH_BULLET}
     -DWITH_EIGEN3:BOOL=${WITH_EIGEN}  # TODO(jamiesnape): Fix naming inconsistency
     -DWITH_GFLAGS:BOOL=${WITH_GFLAGS}
-    -DWITH_GOOGLE_STYLEGUIDE:BOOL=${WITH_GOOGLE_STYLEGUIDE}
     -DWITH_GTEST:BOOL=${WITH_GOOGLETEST}  # TODO(jamiesnape): Fix naming inconsistency
     -DWITH_IPOPT:BOOL=${WITH_IPOPT}
     -DWITH_LCM:BOOL=${WITH_LCM}
@@ -199,7 +188,6 @@ drake_add_external(drake LOCAL PUBLIC CMAKE ALWAYS MATLAB PYTHON VTK
     -DWITH_PYBIND11:BOOL=${WITH_PYBIND11}
     -DWITH_PYTHON_3:BOOL=${WITH_PYTHON_3}
     -DWITH_SPDLOG:BOOL=${WITH_SPDLOG}
-    -DWITH_TEXTBOOK:BOOL=${WITH_TEXTBOOK}
     -DWITH_TINYOBJLOADER:BOOL=${WITH_TINYOBJLOADER}
     -DWITH_YAML_CPP:BOOL=${WITH_YAML_CPP}
   DEPENDS
@@ -208,7 +196,6 @@ drake_add_external(drake LOCAL PUBLIC CMAKE ALWAYS MATLAB PYTHON VTK
     eigen
     fmt
     gflags
-    google_styleguide
     googletest
     ipopt
     lcm
@@ -218,7 +205,6 @@ drake_add_external(drake LOCAL PUBLIC CMAKE ALWAYS MATLAB PYTHON VTK
     pybind11
     robotlocomotion_lcmtypes
     spdlog
-    textbook
     tinyobjloader
     yaml_cpp
 )

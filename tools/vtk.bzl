@@ -26,7 +26,7 @@ Argument:
 VTK_MAJOR_MINOR_VERSION = "8.0"
 
 def _vtk_cc_library(os_name, name, hdrs = None, visibility = None, deps = None,
-                    header_only = False):
+                    header_only = False, linkopts = []):
     hdr_paths = []
 
     if hdrs:
@@ -46,14 +46,13 @@ def _vtk_cc_library(os_name, name, hdrs = None, visibility = None, deps = None,
     if not deps:
         deps = []
 
-    linkopts = []
     srcs = []
 
     if os_name == "mac os x":
         srcs = ["empty.cc"]
 
         if not header_only:
-            linkopts = [
+            linkopts = linkopts + [
                 "-L/usr/local/opt/vtk@{}/lib".format(VTK_MAJOR_MINOR_VERSION),
                 "-l{}-{}".format(name, VTK_MAJOR_MINOR_VERSION),
             ]
@@ -100,11 +99,11 @@ def _impl(repository_ctx):
         distro = " ".join(distro)
 
         if distro == "Ubuntu 14.04":
-            archive = "vtk-v8.0.0-qt-4.8.6-trusty-x86_64.tar.gz"
-            sha256 = "e5240b6fab2f5d7675d11b77d2014987c5337bb6276e38ab8299a1ab1fee5167"  # noqa
+            archive = "vtk-8.0.1-qt-4.8.6-trusty-x86_64.tar.gz"
+            sha256 = "ba58f2fb23a42074ed8f5177f3bc6d4ef8c169a761969f83cfeae32af723b6f1"  # noqa
         elif distro == "Ubuntu 16.04":
-            archive = "vtk-v8.0.0-qt-5.5.1-xenial-x86_64.tar.gz"
-            sha256 = "455edf52f5d7c8d2e8ff6b1e909b6e7c44c61da7922bf8cbe7301a42e9539a3f"  # noqa
+            archive = "vtk-8.0.1-qt-5.5.1-xenial-x86_64.tar.gz"
+            sha256 = "095a88c14c44b8f2655c5932f21ccbfeca840e5815f14b153bc5d5a102940527"  # noqa
         else:
             fail("Linux distribution is NOT supported", attr = distro)
 
@@ -121,6 +120,11 @@ def _impl(repository_ctx):
     # those used directly or indirectly by Drake.
 
     # TODO(jamiesnape): Create a script to help generate the targets.
+
+    # To see what the VTK module dependencies are, you can inspect VTK's source
+    # tree. For example, for vtkIOXML and vtkIOXMLParser:
+    #   VTK/IO/XML/module.cmake
+    #   VTK/IO/XMLParser/module.cmake
 
     file_content = _vtk_cc_library(
         repository_ctx.os.name,
@@ -303,7 +307,10 @@ def _impl(repository_ctx):
     file_content += _vtk_cc_library(
         repository_ctx.os.name,
         "vtkFiltersCore",
-        hdrs = ["vtkFiltersCoreModule.h"],
+        hdrs = [
+            "vtkCleanPolyData.h",
+            "vtkFiltersCoreModule.h",
+        ],
         visibility = ["//visibility:private"],
         deps = [
             ":vtkCommonCore",
@@ -358,6 +365,12 @@ def _impl(repository_ctx):
         ],
     )
 
+    # Compilation failures with system version of LZ4 on Ubuntu 14.04.
+    if repository_ctx.os.name == "linux" and distro == "Ubuntu 14.04":
+        VTKLZ4 = ":vtklz4"
+    else:
+        VTKLZ4 = "@liblz4"
+
     file_content += _vtk_cc_library(
         repository_ctx.os.name,
         "vtkIOCore",
@@ -368,7 +381,41 @@ def _impl(repository_ctx):
         deps = [
             ":vtkCommonCore",
             ":vtkCommonExecutionModel",
-            ":vtklz4",
+            VTKLZ4,
+        ],
+    )
+
+    # See: VTK/IO/XMLParser/{*.h,module.cmake}
+    file_content += _vtk_cc_library(
+        repository_ctx.os.name,
+        "vtkIOXMLParser",
+        deps = [
+            ":vtkCommonCore",
+            ":vtkCommonDataModel",
+            ":vtkIOCore",
+            ":vtksys",
+            "@expat",
+        ],
+    )
+
+    # See: VTK/IO/XML/{*.h,module.cmake}
+    file_content += _vtk_cc_library(
+        repository_ctx.os.name,
+        "vtkIOXML",
+        hdrs = [
+            "vtkIOXMLModule.h",
+            "vtkXMLDataReader.h",
+            "vtkXMLPolyDataReader.h",
+            "vtkXMLReader.h",
+            "vtkXMLUnstructuredDataReader.h",
+        ],
+        deps = [
+            ":vtkCommonCore",
+            ":vtkCommonDataModel",
+            ":vtkCommonExecutionModel",
+            ":vtkIOCore",
+            ":vtkIOXMLParser",
+            ":vtksys",
         ],
     )
 
@@ -469,6 +516,13 @@ def _impl(repository_ctx):
         ],
     )
 
+    # Segmentation faults with system versions of GLEW on Ubuntu 14.04 and
+    # 16.04.
+    if repository_ctx.os.name == "linux":
+        VTKGLEW = ":vtkglew"
+    else:
+        VTKGLEW = "@glew"
+
     file_content += _vtk_cc_library(
         repository_ctx.os.name,
         "vtkRenderingOpenGL2",
@@ -477,23 +531,11 @@ def _impl(repository_ctx):
             ":vtkCommonCore",
             ":vtkCommonDataModel",
             ":vtkRenderingCore",
-            ":vtkglew",
+            VTKGLEW,
         ],
     )
 
-    if repository_ctx.os.name == "mac os x":
-        file_content += """
-cc_library(
-    name = "vtkglew",
-    srcs = ["empty.cc"],
-    linkopts = [
-        "-L/usr/local/opt/glew/lib",
-        "-lGLEW",
-    ],
-    visibility = ["//visibility:private"],
-)
-        """
-    else:
+    if repository_ctx.os.name == "linux":
         file_content += _vtk_cc_library(repository_ctx.os.name, "vtkglew")
 
     file_content += _vtk_cc_library(
@@ -507,7 +549,8 @@ cc_library(
         header_only = True,
     )
 
-    file_content += _vtk_cc_library(repository_ctx.os.name, "vtklz4")
+    if repository_ctx.os.name == "linux" and distro == "Ubuntu 14.04":
+        file_content += _vtk_cc_library(repository_ctx.os.name, "vtklz4")
 
     file_content += _vtk_cc_library(repository_ctx.os.name, "vtkmetaio",
                                     deps = ["@zlib"])

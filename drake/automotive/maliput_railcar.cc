@@ -36,7 +36,7 @@ using systems::InputPortDescriptor;
 using systems::LeafContext;
 using systems::OutputPort;
 using systems::Parameters;
-using systems::SparsityMatrix;
+using systems::SystemSymbolicInspector;
 using systems::State;
 using systems::SystemOutput;
 using systems::VectorBase;
@@ -298,8 +298,7 @@ MaliputRailcar<T>::AllocateAbstractState() const {
 }
 
 template <typename T>
-bool MaliputRailcar<T>::DoHasDirectFeedthrough(
-    const SparsityMatrix*, int, int) const {
+optional<bool> MaliputRailcar<T>::DoHasDirectFeedthrough(int, int) const {
   return false;
 }
 

@@ -5,6 +5,7 @@
 
 #include "drake/common/drake_assert.h"
 #include "drake/common/drake_copyable.h"
+#include "drake/common/unused.h"
 #include "drake/multibody/multibody_tree/body.h"
 #include "drake/multibody/multibody_tree/spatial_inertia.h"
 
@@ -66,9 +67,39 @@ class RigidBody : public Body<T> {
   /// state associated with flexible deformations.
   int get_num_flexible_velocities() const final { return 0; }
 
+  /// Returns the default value of this body's center of mass as measured and
+  /// expressed in this body's frame. This value is initially supplied at
+  /// construction when specifying this body's SpatialInertia.
+  /// @retval p_BoBcm_B The position of this body's center of mass `Bcm`
+  /// measured from this body's frame origin `Bo` and expressed in this
+  /// body's frame B.
+  const Vector3<double>& get_default_com() const {
+    return default_spatial_inertia_.get_com();
+  }
+
   SpatialInertia<T> CalcSpatialInertiaInBodyFrame(
       const MultibodyTreeContext<T>&) const override {
     return default_spatial_inertia_.cast<T>();
+  }
+
+ protected:
+  std::unique_ptr<Body<double>> DoCloneToScalar(
+      const MultibodyTree<double>& tree_clone) const final {
+    return TemplatedDoCloneToScalar(tree_clone);
+  }
+
+  std::unique_ptr<Body<AutoDiffXd>> DoCloneToScalar(
+      const MultibodyTree<AutoDiffXd>& tree_clone) const final {
+    return TemplatedDoCloneToScalar(tree_clone);
+  }
+
+ private:
+  // Helper method to make a clone templated on ToScalar.
+  template <typename ToScalar>
+  std::unique_ptr<Body<ToScalar>> TemplatedDoCloneToScalar(
+      const MultibodyTree<ToScalar>& tree_clone) const {
+    unused(tree_clone);
+    return std::make_unique<RigidBody<ToScalar>>(default_spatial_inertia_);
   }
 
  private:

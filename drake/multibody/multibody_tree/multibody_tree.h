@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "drake/common/drake_copyable.h"
+#include "drake/common/eigen_autodiff_types.h"
 #include "drake/multibody/multibody_tree/acceleration_kinematics_cache.h"
 #include "drake/multibody/multibody_tree/body.h"
 #include "drake/multibody/multibody_tree/body_node.h"
@@ -293,7 +294,7 @@ class MultibodyTree {
                   "MobilizerType must be a sub-class of mobilizer<T>.");
     if (topology_is_valid()) {
       throw std::logic_error("This MultibodyTree is finalized already. "
-                             "Therefore adding more bodies is not allowed. "
+                             "Therefore adding more mobilizers is not allowed. "
                              "See documentation for Finalize() for details.");
     }
     if (mobilizer == nullptr) {
@@ -405,6 +406,11 @@ class MultibodyTree {
     return topology_.get_num_velocities();
   }
 
+  /// Returns the total size of the state vector in the model.
+  int get_num_states() const {
+    return topology_.get_num_states();
+  }
+
   /// Returns the height of the tree data structure of `this` %MultibodyTree.
   /// That is, the number of bodies in the longest kinematic path between the
   /// world and any other leaf body. For a model that only contains the _world_
@@ -432,6 +438,23 @@ class MultibodyTree {
   const Body<T>& get_body(BodyIndex body_index) const {
     DRAKE_ASSERT(body_index < get_num_bodies());
     return *owned_bodies_[body_index];
+  }
+
+  /// Returns a constant reference to the frame with unique index `frame_index`.
+  /// This method aborts in Debug builds when `frame_index` does not correspond
+  /// to a frame in `this` multibody tree.
+  const Frame<T>& get_frame(FrameIndex frame_index) const {
+    DRAKE_ASSERT(frame_index < get_num_frames());
+    return *frames_[frame_index];
+  }
+
+  /// Returns a constant reference to the mobilizer with unique index
+  /// `mobilizer_index`. This method aborts in Debug builds when
+  /// `mobilizer_index` does not correspond to a mobilizer in this multibody
+  /// tree.
+  const Mobilizer<T>& get_mobilizer(MobilizerIndex mobilizer_index) const {
+    DRAKE_ASSERT(mobilizer_index < get_num_mobilizers());
+    return *owned_mobilizers_[mobilizer_index];
   }
 
   /// Returns `true` if this %MultibodyTree was finalized with Finalize() after
@@ -480,7 +503,7 @@ class MultibodyTree {
   // introduction of system's methods to:
   //  - Create a context different from LeafContext, in this case MBTContext.
   //  - Create or request cache entries.
-  std::unique_ptr<systems::Context<T>> CreateDefaultContext() const;
+  std::unique_ptr<systems::LeafContext<T>> CreateDefaultContext() const;
 
   /// Sets default values in the context. For mobilizers, this method sets them
   /// to their _zero_ configuration according to
@@ -598,10 +621,15 @@ class MultibodyTree {
   /// set of generalized forces `tau` that would need to be applied at each
   /// Mobilizer in order to attain the specified generalized accelerations.
   /// Mathematically, this method computes: <pre>
-  ///   tau = M(q) * vdot + C(q, v) * v
+  ///   tau = M(q)v̇ + C(q, v)v - tau_app - ∑ J_WBᵀ(q) Fapp_Bo_W
   /// </pre>
-  /// where `M(q)` is the %MultibodyTree mass matrix and `C(q, v) * v` is the
-  /// bias term containing Coriolis and gyroscopic effects.
+  /// where `M(q)` is the %MultibodyTree mass matrix, `C(q, v)v` is the bias
+  /// term containing Coriolis and gyroscopic effects and `tau_app` consists
+  /// of a vector applied generalized forces. The last term is a summation over
+  /// all bodies in the model where `Fapp_Bo_W` is an applied spatial force on
+  /// body B at `Bo` which gets projected into the space of generalized forces
+  /// with the geometric Jacobian `J_WB(q)` which maps generalized velocities
+  /// into body B spatial velocity as `V_WB = J_WB(q)v`.
   /// This method does not compute explicit expressions for the mass matrix nor
   /// for the bias term, which would be of at least `O(n²)` complexity, but it
   /// implements an `O(n)` Newton-Euler recursive algorithm, where n is the
@@ -622,9 +650,31 @@ class MultibodyTree {
   ///   `context`.
   /// @param[in] known_vdot
   ///   A vector with the known generalized accelerations `vdot` for the full
-  ///   %MultibodyTree model. Use Mobilizer::get_velocities_from_array() to
+  ///   %MultibodyTree model. Use Mobilizer::get_accelerations_from_array() to
   ///   access entries into this array for a particular Mobilizer. You can use
   ///   the mutable version of this method to write into this array.
+  /// @param[in] Fapplied_Bo_W_array
+  ///   A vector containing the spatial force `Fapplied_Bo_W` applied on each
+  ///   body at the body's frame origin `Bo` and expressed in the world frame W.
+  ///   `Fapplied_Bo_W_array` can have zero size which means there are no
+  ///   applied forces. To apply non-zero forces, `Fapplied_Bo_W_array` must be
+  ///   of size equal to the number of bodies in `this` %MultibodyTree model.
+  ///   This array must be ordered by BodyNodeIndex, which for a given body can
+  ///   be retrieved with Body::get_node_index().
+  ///   This method will abort if provided with an array that does not have a
+  ///   size of either `get_num_bodies()` or zero.
+  /// @param[in] tau_applied_array
+  ///   An array of applied generalized forces for the entire model. For a
+  ///   given mobilizer, entries in this array can be accessed using the method
+  ///   Mobilizer::get_generalized_forces_from_array() while its mutable
+  ///   counterpart, Mobilizer::get_mutable_generalized_forces_from_array(),
+  ///   allows writing into this array.
+  ///   `tau_applied_array` can have zero size, which means there are no applied
+  ///   forces. To apply non-zero forces, `tau_applied_array` must be of size
+  ///   equal to the number to the number of generalized velocities in the
+  ///   model, see MultibodyTree::get_num_velocities().
+  ///   This method will abort if provided with an array that does not have a
+  ///   size of either MultibodyTree::get_num_velocities() or zero.
   /// @param[out] A_WB_array
   ///   A pointer to a valid, non nullptr, vector of spatial accelerations
   ///   containing the spatial acceleration `A_WB` for each body. It must be of
@@ -644,9 +694,28 @@ class MultibodyTree {
   ///   On output, entries will be ordered by BodyNodeIndex.
   ///   To access a mobilizer's reaction force on given body B in this array,
   ///   use the index returned by Body::get_node_index().
+  /// @param[out] tau_array
+  ///   On output this array will contain the generalized forces that must be
+  ///   applied in order to achieve the desired generalized accelerations given
+  ///   by the input argument `known_vdot`. It must not be the nullptr and it
+  ///   must be of size MultibodyTree::get_num_velocities(). Generalized forces
+  ///   for each Mobilizer can be accessed with
+  ///   Mobilizer::get_generalized_forces_from_array().
   ///
-  /// @note There is no mechanism to assert that either `A_WB_array` nor
-  ///   `F_BMo_W_array` are ordered by BodyNodeIndex.
+  /// @warning There is no mechanism to assert that either `A_WB_array` nor
+  ///   `F_BMo_W_array` are ordered by BodyNodeIndex. You can use
+  ///   Body::get_node_index() to obtain the node index for a given body.
+  ///
+  /// @note This method uses `F_BMo_W_array` and `tau_array` as the only local
+  /// temporaries and therefore no additional dynamic memory allocation is
+  /// performed.
+  ///
+  /// @warning `F_BMo_W_array` (`tau_array`) and `Fapplied_Bo_W_array`
+  /// (`tau_applied_array`) can actually be the same
+  /// array in order to reduce memory footprint and/or dynamic memory
+  /// allocations. However the information in `Fapplied_Bo_W_array`
+  /// (`tau_applied_array`) would be overwritten through `F_BMo_W_array`
+  /// (`tau_array`). Make a copy if data must be preserved.
   ///
   /// @pre The position kinematics `pc` must have been previously updated with a
   /// call to CalcPositionKinematicsCache().
@@ -654,19 +723,271 @@ class MultibodyTree {
   /// call to CalcVelocityKinematicsCache().
   ///
   /// @throws std::bad_cast if `context` is not a `MultibodyTreeContext`.
-  // TODO(amcastro-tri): add provision for an array of applied spatial forces
-  // per body. These could contain both external as well as constraint forces.
   void CalcInverseDynamics(
       const systems::Context<T>& context,
       const PositionKinematicsCache<T>& pc,
       const VelocityKinematicsCache<T>& vc,
       const VectorX<T>& known_vdot,
+      const std::vector<SpatialForce<T>>& Fapplied_Bo_W_array,
+      const Eigen::Ref<const VectorX<T>>& tau_applied_array,
       std::vector<SpatialAcceleration<T>>* A_WB_array,
       std::vector<SpatialForce<T>>* F_BMo_W_array,
-      VectorX<T>* tau_array) const;
+      EigenPtr<VectorX<T>> tau_array) const;
+
+  /// @name Methods to retrieve multibody element variants
+  ///
+  /// Given two variants of the same %MultibodyTree, these methods map an
+  /// element in one variant, to its corresponding element in the other variant.
+  ///
+  /// A concrete case is the call to ToAutoDiffXd() to obtain a
+  /// %MultibodyTree variant templated on AutoDiffXd from a %MultibodyTree
+  /// templated on `double`. Typically, a user holding a `Body<double>` (or any
+  /// other multibody element in the original variant templated on `double`)
+  /// would like to retrieve the corresponding `Body<AutoDiffXd>` variant from
+  /// the new AutoDiffXd tree variant.
+  ///
+  /// Consider the following code example:
+  /// @code
+  ///   // The user creates a model.
+  ///   MultibodyTree<double> model;
+  ///   // User adds a body and keeps a reference to it.
+  ///   const RigidBody<double>& body = model.AddBody<RigidBody>(...);
+  ///   // User creates an AutoDiffXd variant. Variants on other scalar types
+  ///   // can be created with a call to CloneToScalar().
+  ///   std::unique_ptr<MultibodyTree<Tvariant>> variant_model =
+  ///       model.ToAutoDiffXd();
+  ///   // User retrieves the AutoDiffXd variant corresponding to the original
+  ///   // body added above.
+  ///   const RigidBody<AutoDiffXd>&
+  ///       variant_body = variant_model.get_variant(body);
+  /// @endcode
+  ///
+  /// MultibodyTree::get_variant() is templated on the multibody element
+  /// type which is deduced from its only input argument. The returned element
+  /// is templated on the scalar type T of the %MultibodyTree on which this
+  /// method is invoked.
+  /// @{
+
+  /// SFINAE overload for Frame<T> elements.
+  template <template <typename> class MultibodyElement, typename Scalar>
+  std::enable_if_t<std::is_base_of<Frame<T>, MultibodyElement<T>>::value,
+                   const MultibodyElement<T>&> get_variant(
+      const MultibodyElement<Scalar>& element) const {
+    return get_frame_variant(element);
+  }
+
+  /// SFINAE overload for Body<T> elements.
+  template <template <typename> class MultibodyElement, typename Scalar>
+  std::enable_if_t<std::is_base_of<Body<T>, MultibodyElement<T>>::value,
+                   const MultibodyElement<T>&> get_variant(
+      const MultibodyElement<Scalar>& element) const {
+    return get_body_variant(element);
+  }
+
+  /// SFINAE overload for Mobilizer<T> elements.
+  template <template <typename> class MultibodyElement, typename Scalar>
+  std::enable_if_t<std::is_base_of<Mobilizer<T>, MultibodyElement<T>>::value,
+                   const MultibodyElement<T>&> get_variant(
+      const MultibodyElement<Scalar>& element) const {
+    return get_mobilizer_variant(element);
+  }
+  /// @}
+
+  /// Creates a deep copy of `this` %MultibodyTree templated on the same
+  /// scalar type T as `this` tree.
+  std::unique_ptr<MultibodyTree<T>> Clone() const {
+    return CloneToScalar<T>();
+  }
+
+  /// Creates a deep copy of `this` %MultibodyTree templated on AutoDiffXd.
+  std::unique_ptr<MultibodyTree<AutoDiffXd>> ToAutoDiffXd() const {
+    return CloneToScalar<AutoDiffXd>();
+  }
+
+  /// Creates a deep copy of `this` %MultibodyTree templated on the scalar type
+  /// `ToScalar`.
+  /// The new deep copy is guaranteed to have exactly the same
+  /// MultibodyTreeTopology as the original tree the method is called on.
+  /// This method ensures the following cloning order:
+  ///   - Body objects, and their corresponding BodyFrame objects.
+  ///   - Frame objects.
+  ///   - If a Frame is attached to another frame, its parent frame is
+  ///     guaranteed to be created first.
+  ///   - Mobilizer objects are created last and therefore clones of the
+  ///     original Frame objects are guaranteed to already be part of the cloned
+  ///     tree.
+  /// @pre Finalize() must have already been called on this %MultibodyTree.
+  template <typename ToScalar>
+  std::unique_ptr<MultibodyTree<ToScalar>> CloneToScalar() const {
+    if (!topology_is_valid()) {
+      throw std::logic_error(
+          "Attempting to clone a MultibodyTree with an invalid topology. "
+          "MultibodyTree::Finalize() must be called before attempting to clone"
+          " a MultibodyTree.");
+    }
+    auto tree_clone = std::make_unique<MultibodyTree<ToScalar>>();
+
+    tree_clone->frames_.resize(get_num_frames());
+    // Skipping the world body at body_index = 0.
+    for (BodyIndex body_index(1); body_index < get_num_bodies(); ++body_index) {
+      const Body<T>& body = get_body(body_index);
+      tree_clone->CloneBodyAndAdd(body);
+    }
+
+    // Frames are cloned in their index order, that is, in the exact same order
+    // they were added to the original tree. Since the Frame API enforces the
+    // creation of the parent frame first, this traversal guarantees that parent
+    // body frames are created before their child frames.
+    for (const auto& frame : owned_frames_) {
+      tree_clone->CloneFrameAndAdd(*frame);
+    }
+
+    for (const auto& mobilizer : owned_mobilizers_) {
+      // This call assumes that tree_clone already contains all the cloned
+      // frames.
+      tree_clone->CloneMobilizerAndAdd(*mobilizer);
+    }
+
+    // We can safely make a deep copy here since the original multibody tree is
+    // required to be finalized.
+    tree_clone->topology_ = this->topology_;
+    // All other internals templated on T are created with the following call to
+    // FinalizeInternals().
+    tree_clone->FinalizeInternals();
+    return tree_clone;
+  }
 
  private:
+  // Make MultibodyTree templated on every other scalar type a friend of
+  // MultibodyTree<T> so that CloneToScalar<ToAnyOtherScalar>() can access
+  // private methods from MultibodyTree<T>.
+  template <typename> friend class MultibodyTree;
+
+  // Finalizes the MultibodyTreeTopology of this tree.
+  void FinalizeTopology();
+
+  // At Finalize(), this method performs all other finalization that is not
+  // topological (i.e. performed by FinalizeTopology()). This includes for
+  // instance the creation of BodyNode objects.
+  // This method will throw a std::logic_error if FinalizeTopology() was not
+  // previously called on this tree.
+  void FinalizeInternals();
+
   void CreateBodyNode(BodyNodeIndex body_node_index);
+
+  // Helper method to create a clone of `frame` and add it to `this` tree.
+  template <typename FromScalar>
+  Frame<T>* CloneFrameAndAdd(const Frame<FromScalar>& frame) {
+    FrameIndex frame_index = frame.get_index();
+
+    auto frame_clone = frame.CloneToScalar(*this);
+    frame_clone->set_parent_tree(this, frame_index);
+
+    Frame<T>* raw_frame_clone_ptr = frame_clone.get();
+    // The order in which frames are added into frames_ is important to keep the
+    // topology invariant. Therefore we index new clones according to the
+    // original frame_index.
+    frames_[frame_index] = raw_frame_clone_ptr;
+    // The order within owned_frames_ does not matter.
+    owned_frames_.push_back(std::move(frame_clone));
+    return raw_frame_clone_ptr;
+  }
+
+  // Helper method to create a clone of `body` and add it to `this` tree.
+  // Because this method is only invoked in a controlled manner from within
+  // CloneToScalar(), it is guaranteed that the cloned body in this variant's
+  // `owned_bodies_` will occupy the same position as its corresponding Body
+  // in the source variant `body`.
+  template <typename FromScalar>
+  Body<T>* CloneBodyAndAdd(const Body<FromScalar>& body) {
+    const BodyIndex body_index = body.get_index();
+    const FrameIndex body_frame_index = body.get_body_frame().get_index();
+
+    auto body_clone = body.CloneToScalar(*this);
+    body_clone->set_parent_tree(this, body_index);
+    // MultibodyTree can access selected private methods in Body through its
+    // BodyAttorney.
+    Frame<T>* body_frame_clone =
+        &internal::BodyAttorney<T>::get_mutable_body_frame(body_clone.get());
+    body_frame_clone->set_parent_tree(this, body_frame_index);
+
+    // The order in which frames are added into frames_ is important to keep the
+    // topology invariant. Therefore we index new clones according to the
+    // original body_frame_index.
+    frames_[body_frame_index] = body_frame_clone;
+    Body<T>* raw_body_clone_ptr = body_clone.get();
+    // The order in which bodies are added into owned_bodies_ is important to
+    // keep the topology invariant. Therefore this method is called from
+    // MultibodyTree::CloneToScalar() within a loop by original body_index.
+    DRAKE_DEMAND(static_cast<int>(owned_bodies_.size()) == body_index);
+    owned_bodies_.push_back(std::move(body_clone));
+    return raw_body_clone_ptr;
+  }
+
+  // Helper method to create a clone of `mobilizer` and add it to `this` tree.
+  template <typename FromScalar>
+  Mobilizer<T>* CloneMobilizerAndAdd(const Mobilizer<FromScalar>& mobilizer) {
+    MobilizerIndex mobilizer_index = mobilizer.get_index();
+    auto mobilizer_clone = mobilizer.CloneToScalar(*this);
+    mobilizer_clone->set_parent_tree(this, mobilizer_index);
+    Mobilizer<T>* raw_mobilizer_clone_ptr = mobilizer_clone.get();
+    owned_mobilizers_.push_back(std::move(mobilizer_clone));
+    return raw_mobilizer_clone_ptr;
+  }
+
+  // Helper method to retrieve the corresponding Frame<T> variant to a Frame in
+  // a MultibodyTree variant templated on Scalar.
+  template <template <typename> class FrameType, typename Scalar>
+  const FrameType<T>& get_frame_variant(const FrameType<Scalar>& frame) const {
+    static_assert(std::is_convertible<FrameType<T>*, Frame<T>*>::value,
+                  "FrameType must be a sub-class of Frame<T>.");
+    // TODO(amcastro-tri):
+    //   DRAKE_DEMAND the parent tree of the variant is indeed a variant of this
+    //   MultibodyTree. That will require the tree to have some sort of id.
+    FrameIndex frame_index = frame.get_index();
+    DRAKE_DEMAND(frame_index < get_num_frames());
+    const FrameType<T>* frame_variant =
+        dynamic_cast<const FrameType<T>*>(frames_[frame_index]);
+    DRAKE_DEMAND(frame_variant != nullptr);
+    return *frame_variant;
+  }
+
+  // Helper method to retrieve the corresponding Body<T> variant to a Body in a
+  // MultibodyTree variant templated on Scalar.
+  template <template <typename> class BodyType, typename Scalar>
+  const BodyType<T>& get_body_variant(const BodyType<Scalar>& body) const {
+    static_assert(std::is_convertible<BodyType<T>*, Body<T>*>::value,
+                  "BodyType must be a sub-class of Body<T>.");
+    // TODO(amcastro-tri):
+    //   DRAKE_DEMAND the parent tree of the variant is indeed a variant of this
+    //   MultibodyTree. That will require the tree to have some sort of id.
+    BodyIndex body_index = body.get_index();
+    DRAKE_DEMAND(body_index < get_num_bodies());
+    const BodyType<T>* body_variant =
+        dynamic_cast<const BodyType<T>*>(
+            owned_bodies_[body_index].get());
+    DRAKE_DEMAND(body_variant != nullptr);
+    return *body_variant;
+  }
+
+  // Helper method to retrieve the corresponding Mobilizer<T> variant to a Body
+  // in a MultibodyTree variant templated on Scalar.
+  template <template <typename> class MobilizerType, typename Scalar>
+  const MobilizerType<T>& get_mobilizer_variant(
+      const MobilizerType<Scalar>& mobilizer) const {
+    static_assert(std::is_convertible<MobilizerType<T>*, Mobilizer<T>*>::value,
+                  "MobilizerType must be a sub-class of Mobilizer<T>.");
+    // TODO(amcastro-tri):
+    //   DRAKE_DEMAND the parent tree of the variant is indeed a variant of this
+    //   MultibodyTree. That will require the tree to have some sort of id.
+    MobilizerIndex mobilizer_index = mobilizer.get_index();
+    DRAKE_DEMAND(mobilizer_index < get_num_mobilizers());
+    const MobilizerType<T>* mobilizer_variant =
+        dynamic_cast<const MobilizerType<T>*>(
+            owned_mobilizers_[mobilizer_index].get());
+    DRAKE_DEMAND(mobilizer_variant != nullptr);
+    return *mobilizer_variant;
+  }
 
   // TODO(amcastro-tri): In future PR's adding MBT computational methods, write
   // a method that verifies the state of the topology with a signature similar

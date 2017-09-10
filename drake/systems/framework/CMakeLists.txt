@@ -24,7 +24,8 @@ set(sources
   parameters.cc
   single_output_vector_source.cc
   vector_system.cc
-  sparsity_matrix.cc
+  system_constraint.cc
+  system_symbolic_inspector.cc
   state.cc
   subvector.cc
   supervector.cc
@@ -70,12 +71,13 @@ set(installed_headers
   parameters.h
   scalar_conversion_traits.h
   single_output_vector_source.h
-  sparsity_matrix.h
+    system_symbolic_inspector.h
   state.h
   subvector.h
   supervector.h
   system.h
   system_common.h
+  system_constraint.h
   system_scalar_converter.h
   system_type_tag.h
   value.h
